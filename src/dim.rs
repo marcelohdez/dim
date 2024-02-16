@@ -12,7 +12,9 @@ use smithay_client_toolkit::{
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{
-        keyboard::KeyboardHandler, pointer::PointerHandler, Capability, SeatHandler, SeatState,
+        keyboard::KeyboardHandler,
+        pointer::{PointerEvent, PointerEventKind, PointerHandler},
+        Capability, SeatHandler, SeatState,
     },
     shell::{
         wlr_layer::{LayerShellHandler, LayerSurface},
@@ -320,10 +322,14 @@ impl PointerHandler for DimData {
         _conn: &smithay_client_toolkit::reexports::client::Connection,
         _qh: &QueueHandle<Self>,
         _pointer: &wl_pointer::WlPointer,
-        _events: &[smithay_client_toolkit::seat::pointer::PointerEvent],
+        events: &[PointerEvent],
     ) {
-        debug!("Captured pointer frame!");
-        self.exit = true;
+        for e in events {
+            match e.kind {
+                PointerEventKind::Enter { .. } => debug!("Mouse entered!"),
+                _ => self.exit = true,
+            }
+        }
     }
 }
 
