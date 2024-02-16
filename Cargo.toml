@@ -1,0 +1,17 @@
+[package]
+name = "dim"
+authors = ["Marcelo Hernandez <marcelohdez.inq@gmail.com>"]
+description = "Native Wayland screen dimming tool"
+homepage = "https://github.com/marcelohdez/dim"
+license = "GPL-3.0-only"
+keywords = ["wayland", "smithay"]
+
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.79"
+clap = "4.5.0"
+env_logger = "0.11.2"
+log = "0.4.20"
+smithay-client-toolkit = "0.18.1"
