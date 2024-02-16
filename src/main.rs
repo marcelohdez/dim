@@ -4,7 +4,7 @@ use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::client::{globals::registry_queue_init, Connection},
     shell::{
-        wlr_layer::{Anchor, KeyboardInteractivity, Layer, LayerShell},
+        wlr_layer::{KeyboardInteractivity, Layer, LayerShell},
         WaylandSurface,
     },
     shm::{slot::SlotPool, Shm},
@@ -27,7 +27,6 @@ fn main() -> anyhow::Result<()> {
     let layer =
         layer_shell.create_layer_surface(&qh, surface, Layer::Overlay, Some("dim_layer"), None);
 
-    layer.set_anchor(Anchor::TOP);
     layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
     layer.set_size(INIT_SIZE, INIT_SIZE);
 
