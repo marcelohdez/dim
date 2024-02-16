@@ -1,5 +1,5 @@
 use anyhow::{Context, Ok};
-use dim::dim::DimData;
+use dim::{dim::DimData, INIT_SIZE};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::client::{globals::registry_queue_init, Connection},
@@ -9,8 +9,6 @@ use smithay_client_toolkit::{
     },
     shm::{slot::SlotPool, Shm},
 };
-
-const SIZE: u32 = 100;
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -31,11 +29,11 @@ fn main() -> anyhow::Result<()> {
 
     layer.set_anchor(Anchor::TOP);
     layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
-    layer.set_size(SIZE, SIZE);
+    layer.set_size(INIT_SIZE, INIT_SIZE);
 
     layer.commit();
 
-    let size_in_bytes = SIZE as usize * SIZE as usize * 4;
+    let size_in_bytes = INIT_SIZE as usize * INIT_SIZE as usize * 4;
     let pool = SlotPool::new(size_in_bytes, &shm).context("Failed to create shm pool")?;
 
     let mut data = DimData::new(&globals, &qh, shm, pool, layer);

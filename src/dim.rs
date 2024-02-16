@@ -21,6 +21,8 @@ use smithay_client_toolkit::{
     shm::{slot::SlotPool, Shm, ShmHandler},
 };
 
+use crate::INIT_SIZE;
+
 pub struct DimData {
     registry_state: RegistryState,
     seat_state: SeatState,
@@ -55,8 +57,8 @@ impl DimData {
             exit: false,
             first_configure: true,
             pool,
-            width: 100,
-            height: 100,
+            width: INIT_SIZE,
+            height: INIT_SIZE,
             layer,
             keyboard: None,
             keyboard_focus: true,
@@ -345,8 +347,8 @@ impl LayerShellHandler for DimData {
         _serial: u32,
     ) {
         if configure.new_size.0 == 0 || configure.new_size.1 == 0 {
-            self.width = 100;
-            self.height = 100;
+            self.width = INIT_SIZE;
+            self.height = INIT_SIZE;
         } else {
             self.width = configure.new_size.0;
             self.height = configure.new_size.1;
