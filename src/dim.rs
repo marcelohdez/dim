@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use log::debug;
 use smithay_client_toolkit::{
-    compositor::CompositorHandler,
+    compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_simple,
     output::{OutputHandler, OutputState},
@@ -9,7 +11,9 @@ use smithay_client_toolkit::{
             globals::GlobalList,
             protocol::{
                 wl_buffer::{self, WlBuffer},
-                wl_keyboard, wl_pointer,
+                wl_keyboard,
+                wl_output::WlOutput,
+                wl_pointer,
             },
             Connection, Dispatch, QueueHandle,
         },
@@ -19,7 +23,7 @@ use smithay_client_toolkit::{
             },
             viewporter::client::{
                 wp_viewport::{self, WpViewport},
-                wp_viewporter::WpViewporter,
+                wp_viewporter::{self, WpViewporter},
             },
         },
     },
@@ -31,7 +35,7 @@ use smithay_client_toolkit::{
         Capability, SeatHandler, SeatState,
     },
     shell::{
-        wlr_layer::{LayerShellHandler, LayerSurface},
+        wlr_layer::{KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface},
         WaylandSurface,
     },
 };
@@ -39,47 +43,52 @@ use smithay_client_toolkit::{
 use crate::INIT_SIZE;
 
 pub struct DimData {
+    compositor: CompositorState,
     registry_state: RegistryState,
     seat_state: SeatState,
     output_state: OutputState,
+    layer_shell: LayerShell,
+    pixel_buffer_mgr: SimpleGlobal<WpSinglePixelBufferManagerV1, 1>,
+    viewporter: SimpleGlobal<WpViewporter, 1>,
+
+    views: HashMap<WlOutput, DimView>,
 
     exit: bool,
+    keyboard: Option<wl_keyboard::WlKeyboard>,
+    keyboard_focus: bool,
+    pointer: Option<wl_pointer::WlPointer>,
+}
+
+struct DimView {
     first_configure: bool,
     width: u32,
     height: u32,
     buffer: WlBuffer,
     viewport: WpViewport,
     layer: LayerSurface,
-    keyboard: Option<wl_keyboard::WlKeyboard>,
-    keyboard_focus: bool,
-    pointer: Option<wl_pointer::WlPointer>,
 }
 
 impl DimData {
     pub fn new(
+        compositor: CompositorState,
         globals: &GlobalList,
         qh: &QueueHandle<Self>,
-        viewport: WpViewport,
-        layer: LayerSurface,
+        layer_shell: LayerShell,
     ) -> Self {
         Self {
+            compositor,
             registry_state: RegistryState::new(globals),
             seat_state: SeatState::new(globals, qh),
             output_state: OutputState::new(globals, qh),
+            layer_shell,
+            pixel_buffer_mgr: SimpleGlobal::<WpSinglePixelBufferManagerV1, 1>::bind(globals, qh)
+                .expect("wp_single_pixel_buffer_manager_v1 not available!"),
+            viewporter: SimpleGlobal::<wp_viewporter::WpViewporter, 1>::bind(globals, qh)
+                .expect("wp_viewporter not available"),
+
+            views: HashMap::new(),
 
             exit: false,
-            first_configure: true,
-            width: INIT_SIZE,
-            height: INIT_SIZE,
-            buffer: {
-                SimpleGlobal::<WpSinglePixelBufferManagerV1, 1>::bind(globals, qh)
-                    .expect("wp_single_pixel_buffer_manager_v1 not available!")
-                    .get()
-                    .expect("Failed to get buffer manager")
-                    .create_u32_rgba_buffer(0, 0, 0, u32::MAX, qh, ())
-            },
-            viewport,
-            layer,
             keyboard: None,
             keyboard_focus: true,
             pointer: None,
@@ -90,7 +99,54 @@ impl DimData {
         self.exit
     }
 
-    pub fn draw(&mut self, qh: &QueueHandle<Self>) {
+    fn create_view(&self, qh: &QueueHandle<Self>) -> DimView {
+        let surface = self.compositor.create_surface(qh);
+        let layer = self.layer_shell.create_layer_surface(
+            qh,
+            surface,
+            Layer::Overlay,
+            Some("dim_layer"),
+            None,
+        );
+
+        layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
+        layer.set_size(INIT_SIZE, INIT_SIZE);
+
+        layer.commit();
+
+        let viewport = self
+            .viewporter
+            .get()
+            .expect("wp_viewporter failed")
+            .get_viewport(layer.wl_surface(), qh, ());
+
+        DimView::new(
+            self.pixel_buffer_mgr.get().expect("failed to get buffer"),
+            qh,
+            viewport,
+            layer,
+        )
+    }
+}
+
+impl DimView {
+    fn new(
+        mgr: &WpSinglePixelBufferManagerV1,
+        qh: &QueueHandle<DimData>,
+        viewport: WpViewport,
+        layer: LayerSurface,
+    ) -> Self {
+        Self {
+            first_configure: true,
+            width: INIT_SIZE,
+            height: INIT_SIZE,
+            buffer: mgr.create_u32_rgba_buffer(0, 0, 0, u32::MAX, qh, ()),
+            viewport,
+            layer,
+        }
+    }
+
+    fn draw(&mut self, qh: &QueueHandle<DimData>) {
         self.layer
             .wl_surface()
             .damage_buffer(0, 0, self.width as i32, self.height as i32);
@@ -131,7 +187,9 @@ impl CompositorHandler for DimData {
         _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _time: u32,
     ) {
-        self.draw(qh);
+        for view in self.views.values_mut() {
+            view.draw(qh);
+        }
     }
 }
 
@@ -143,25 +201,29 @@ impl OutputHandler for DimData {
     fn new_output(
         &mut self,
         _conn: &smithay_client_toolkit::reexports::client::Connection,
-        _qh: &QueueHandle<Self>,
-        _output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
+        qh: &QueueHandle<Self>,
+        output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
+        self.views.insert(output, self.create_view(qh));
     }
 
     fn update_output(
         &mut self,
         _conn: &smithay_client_toolkit::reexports::client::Connection,
-        _qh: &QueueHandle<Self>,
-        _output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
+        qh: &QueueHandle<Self>,
+        output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
+        self.views.remove(&output);
+        self.views.insert(output, self.create_view(qh));
     }
 
     fn output_destroyed(
         &mut self,
         _conn: &smithay_client_toolkit::reexports::client::Connection,
         _qh: &QueueHandle<Self>,
-        _output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
+        output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
+        self.views.remove(&output);
     }
 }
 
@@ -248,7 +310,11 @@ impl KeyboardHandler for DimData {
         _raw: &[u32],
         _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
     ) {
-        if surface == self.layer.wl_surface() {
+        if self
+            .views
+            .values()
+            .any(|view| view.layer.wl_surface() == surface)
+        {
             debug!("Gained keyboard focus");
             self.keyboard_focus = true;
         }
@@ -262,7 +328,11 @@ impl KeyboardHandler for DimData {
         surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _serial: u32,
     ) {
-        if surface == self.layer.wl_surface() {
+        if self
+            .views
+            .values()
+            .any(|view| view.layer.wl_surface() == surface)
+        {
             debug!("Lost keyboard focus");
             self.keyboard_focus = false;
         }
@@ -339,15 +409,17 @@ impl LayerShellHandler for DimData {
         configure: smithay_client_toolkit::shell::wlr_layer::LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        (self.width, self.height) = configure.new_size;
+        for view in self.views.values_mut() {
+            (view.width, view.height) = configure.new_size;
 
-        self.viewport
-            .set_destination(self.width as _, self.height as _);
+            view.viewport
+                .set_destination(view.width as _, view.height as _);
 
-        // Initiare first draw
-        if self.first_configure {
-            self.first_configure = false;
-            self.draw(qh);
+            // Initiare first draw
+            if view.first_configure {
+                view.first_configure = false;
+                view.draw(qh);
+            }
         }
     }
 }
@@ -410,7 +482,7 @@ impl Dispatch<WlBuffer, ()> for DimData {
     }
 }
 
-impl Drop for DimData {
+impl Drop for DimView {
     fn drop(&mut self) {
         self.viewport.destroy();
         self.buffer.destroy();
