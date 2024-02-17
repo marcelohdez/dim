@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log::debug;
+use log::{debug, error};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
@@ -99,14 +99,14 @@ impl DimData {
         self.exit
     }
 
-    fn create_view(&self, qh: &QueueHandle<Self>) -> DimView {
+    fn create_view(&self, qh: &QueueHandle<Self>, output: &WlOutput) -> DimView {
         let surface = self.compositor.create_surface(qh);
         let layer = self.layer_shell.create_layer_surface(
             qh,
             surface,
             Layer::Overlay,
             Some("dim_layer"),
-            None,
+            Some(output),
         );
 
         layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
@@ -147,6 +147,11 @@ impl DimView {
     }
 
     fn draw(&mut self, qh: &QueueHandle<DimData>) {
+        if !self.first_configure {
+            // we only need to draw once as it is a static color
+            return;
+        }
+
         self.layer
             .wl_surface()
             .damage_buffer(0, 0, self.width as i32, self.height as i32);
@@ -157,7 +162,42 @@ impl DimView {
         self.layer.commit();
 
         debug!("Drawn");
-        // TODO save and reuse buffer when the window size is unchanged.
+    }
+}
+
+impl LayerShellHandler for DimData {
+    fn closed(
+        &mut self,
+        _conn: &smithay_client_toolkit::reexports::client::Connection,
+        _qh: &QueueHandle<Self>,
+        _layer: &LayerSurface,
+    ) {
+        debug!("Closed");
+        self.exit = true;
+    }
+
+    fn configure(
+        &mut self,
+        _conn: &smithay_client_toolkit::reexports::client::Connection,
+        qh: &QueueHandle<Self>,
+        layer: &LayerSurface,
+        configure: smithay_client_toolkit::shell::wlr_layer::LayerSurfaceConfigure,
+        _serial: u32,
+    ) {
+        let Some(view) = self.views.values_mut().find(|view| &view.layer == layer) else {
+            error!("Configuring layer not belonging to self.views?");
+            return;
+        };
+
+        (view.width, view.height) = configure.new_size;
+
+        view.viewport
+            .set_destination(view.width as _, view.height as _);
+
+        if view.first_configure {
+            view.draw(qh);
+            view.first_configure = false;
+        }
     }
 }
 
@@ -204,7 +244,8 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        self.views.insert(output, self.create_view(qh));
+        let view = self.create_view(qh, &output);
+        self.views.insert(output, view);
     }
 
     fn update_output(
@@ -214,7 +255,8 @@ impl OutputHandler for DimData {
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
         self.views.remove(&output);
-        self.views.insert(output, self.create_view(qh));
+        let view = self.create_view(qh, &output);
+        self.views.insert(output, view);
     }
 
     fn output_destroyed(
@@ -383,42 +425,10 @@ impl PointerHandler for DimData {
     ) {
         for e in events {
             match e.kind {
-                PointerEventKind::Enter { .. } => debug!("Mouse entered!"),
+                PointerEventKind::Enter { .. } | PointerEventKind::Leave { .. } => {
+                    debug!("Mouse left or entered!")
+                }
                 _ => self.exit = true,
-            }
-        }
-    }
-}
-
-impl LayerShellHandler for DimData {
-    fn closed(
-        &mut self,
-        _conn: &smithay_client_toolkit::reexports::client::Connection,
-        _qh: &QueueHandle<Self>,
-        _layer: &LayerSurface,
-    ) {
-        debug!("Closed");
-        self.exit = true;
-    }
-
-    fn configure(
-        &mut self,
-        _conn: &smithay_client_toolkit::reexports::client::Connection,
-        qh: &QueueHandle<Self>,
-        _layer: &LayerSurface,
-        configure: smithay_client_toolkit::shell::wlr_layer::LayerSurfaceConfigure,
-        _serial: u32,
-    ) {
-        for view in self.views.values_mut() {
-            (view.width, view.height) = configure.new_size;
-
-            view.viewport
-                .set_destination(view.width as _, view.height as _);
-
-            // Initiare first draw
-            if view.first_configure {
-                view.first_configure = false;
-                view.draw(qh);
             }
         }
     }
