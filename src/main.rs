@@ -2,16 +2,18 @@ use anyhow::{Context, Ok};
 use dim::{dim::DimData, INIT_SIZE};
 use smithay_client_toolkit::{
     compositor::CompositorState,
-    reexports::client::{globals::registry_queue_init, Connection},
+    reexports::{
+        client::{globals::registry_queue_init, Connection},
+        protocols::wp::{
+            single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1,
+            viewporter::client::wp_viewporter,
+        },
+    },
     registry::SimpleGlobal,
     shell::{
         wlr_layer::{KeyboardInteractivity, Layer, LayerShell},
         WaylandSurface,
     },
-};
-use wayland_protocols::wp::{
-    single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1,
-    viewporter::client::wp_viewporter,
 };
 
 fn main() -> anyhow::Result<()> {

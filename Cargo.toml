@@ -11,8 +11,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.79"
-clap = "4.5.0"
+clap = "4.5.1"
 env_logger = "0.11.2"
 log = "0.4.20"
 smithay-client-toolkit = "0.18.1"
-wayland-protocols = "0.31.2"

@@ -4,13 +4,24 @@ use smithay_client_toolkit::{
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_simple,
     output::{OutputHandler, OutputState},
-    reexports::client::{
-        globals::GlobalList,
-        protocol::{
-            wl_buffer::{self, WlBuffer},
-            wl_keyboard, wl_pointer,
+    reexports::{
+        client::{
+            globals::GlobalList,
+            protocol::{
+                wl_buffer::{self, WlBuffer},
+                wl_keyboard, wl_pointer,
+            },
+            Connection, Dispatch, QueueHandle,
         },
-        Connection, Dispatch, QueueHandle,
+        protocols::wp::{
+            single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1::{
+                self, WpSinglePixelBufferManagerV1,
+            },
+            viewporter::client::{
+                wp_viewport::{self, WpViewport},
+                wp_viewporter::WpViewporter,
+            },
+        },
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -22,15 +33,6 @@ use smithay_client_toolkit::{
     shell::{
         wlr_layer::{LayerShellHandler, LayerSurface},
         WaylandSurface,
-    },
-};
-use wayland_protocols::wp::{
-    single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1::{
-        self, WpSinglePixelBufferManagerV1,
-    },
-    viewporter::client::{
-        wp_viewport::{self, WpViewport},
-        wp_viewporter::WpViewporter,
     },
 };
 
