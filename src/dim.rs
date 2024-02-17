@@ -109,8 +109,20 @@ impl DimData {
             Some(output),
         );
 
+        let (width, height) = if let Some((width, height)) = self
+            .output_state
+            .info(output)
+            .and_then(|info| info.logical_size)
+        {
+            // FIXME: assuming other layershells like waybar are <= 32 px thick,
+            // as dim is moved by them so _just_ the screen size will leave gaps
+            (width as u32 + 32, height as u32 + 32)
+        } else {
+            (INIT_SIZE, INIT_SIZE)
+        };
+
         layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
-        layer.set_size(INIT_SIZE, INIT_SIZE);
+        layer.set_size(width, height);
 
         layer.commit();
 
@@ -185,7 +197,7 @@ impl LayerShellHandler for DimData {
         _serial: u32,
     ) {
         let Some(view) = self.views.values_mut().find(|view| &view.layer == layer) else {
-            error!("Configuring layer not belonging to self.views?");
+            error!("Configuring layer not in self.views?");
             return;
         };
 
