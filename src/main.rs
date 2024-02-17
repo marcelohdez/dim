@@ -3,11 +3,15 @@ use dim::{dim::DimData, INIT_SIZE};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::client::{globals::registry_queue_init, Connection},
+    registry::SimpleGlobal,
     shell::{
         wlr_layer::{KeyboardInteractivity, Layer, LayerShell},
         WaylandSurface,
     },
-    shm::{slot::SlotPool, Shm},
+};
+use wayland_protocols::wp::{
+    single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1,
+    viewporter::client::wp_viewporter,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -20,10 +24,23 @@ fn main() -> anyhow::Result<()> {
     let qh = event_queue.handle();
 
     let compositor = CompositorState::bind(&globals, &qh).context("Compositor not available")?;
-    let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
-    let shm = Shm::bind(&globals, &qh).context("wl_shm not available")?;
+    let single_pixel_mngr = SimpleGlobal::<WpSinglePixelBufferManagerV1, 1>::bind(&globals, &qh)
+        .context("wp_single_pixel_buffer_manager_v1 not available!")?;
+    let buffer = single_pixel_mngr
+        .get()
+        .context("Failed to get buffer manager")?
+        .create_u32_rgba_buffer(0, 0, 0, u32::MAX, &qh, ());
 
     let surface = compositor.create_surface(&qh);
+
+    let wp_viewporter = SimpleGlobal::<wp_viewporter::WpViewporter, 1>::bind(&globals, &qh)
+        .expect("wp_viewporter not available");
+    let viewport = wp_viewporter
+        .get()
+        .expect("wp_viewporter failed")
+        .get_viewport(&surface, &qh, ());
+
+    let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
     let layer =
         layer_shell.create_layer_surface(&qh, surface, Layer::Overlay, Some("dim_layer"), None);
 
@@ -32,10 +49,7 @@ fn main() -> anyhow::Result<()> {
 
     layer.commit();
 
-    let size_in_bytes = INIT_SIZE as usize * INIT_SIZE as usize * 4;
-    let pool = SlotPool::new(size_in_bytes, &shm).context("Failed to create shm pool")?;
-
-    let mut data = DimData::new(&globals, &qh, shm, pool, layer);
+    let mut data = DimData::new(&globals, &qh, buffer, viewport, layer);
 
     loop {
         event_queue

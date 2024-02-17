@@ -201,6 +201,7 @@ dependencies = [
  "env_logger",
  "log",
  "smithay-client-toolkit",
+ "wayland-protocols",
 ]
 
 [[package]]

@@ -2,12 +2,15 @@ use log::debug;
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_shm,
+    delegate_registry, delegate_seat, delegate_simple,
     output::{OutputHandler, OutputState},
     reexports::client::{
         globals::GlobalList,
-        protocol::{wl_keyboard, wl_pointer, wl_shm},
-        QueueHandle,
+        protocol::{
+            wl_buffer::{self, WlBuffer},
+            wl_keyboard, wl_pointer,
+        },
+        Connection, Dispatch, QueueHandle,
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
@@ -20,7 +23,15 @@ use smithay_client_toolkit::{
         wlr_layer::{LayerShellHandler, LayerSurface},
         WaylandSurface,
     },
-    shm::{slot::SlotPool, Shm, ShmHandler},
+};
+use wayland_protocols::wp::{
+    single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1::{
+        self, WpSinglePixelBufferManagerV1,
+    },
+    viewporter::client::{
+        wp_viewport::{self, WpViewport},
+        wp_viewporter::WpViewporter,
+    },
 };
 
 use crate::INIT_SIZE;
@@ -29,13 +40,13 @@ pub struct DimData {
     registry_state: RegistryState,
     seat_state: SeatState,
     output_state: OutputState,
-    shm: Shm,
 
     exit: bool,
     first_configure: bool,
-    pool: SlotPool,
     width: u32,
     height: u32,
+    buffer: WlBuffer,
+    viewport: WpViewport,
     layer: LayerSurface,
     keyboard: Option<wl_keyboard::WlKeyboard>,
     keyboard_focus: bool,
@@ -46,21 +57,21 @@ impl DimData {
     pub fn new(
         globals: &GlobalList,
         qh: &QueueHandle<Self>,
-        shm: Shm,
-        pool: SlotPool,
+        buffer: WlBuffer,
+        viewport: WpViewport,
         layer: LayerSurface,
     ) -> Self {
         Self {
             registry_state: RegistryState::new(globals),
             seat_state: SeatState::new(globals, qh),
             output_state: OutputState::new(globals, qh),
-            shm,
 
             exit: false,
             first_configure: true,
-            pool,
             width: INIT_SIZE,
             height: INIT_SIZE,
+            buffer,
+            viewport,
             layer,
             keyboard: None,
             keyboard_focus: true,
@@ -73,39 +84,13 @@ impl DimData {
     }
 
     pub fn draw(&mut self, qh: &QueueHandle<Self>) {
-        let stride = self.width as i32 * 4;
-
-        let (buffer, canvas) = self
-            .pool
-            .create_buffer(
-                self.width as i32,
-                self.height as i32,
-                stride,
-                wl_shm::Format::Argb8888,
-            )
-            .expect("Failed to create buffer");
-
-        canvas
-            .chunks_exact_mut(4)
-            .enumerate()
-            .for_each(|(_, chunk)| {
-                let alpha = 255;
-                let shade = 64_u32;
-
-                let color = (alpha << 24) + (shade << 16) + (shade << 8) + shade;
-                let array: &mut [u8; 4] = chunk.try_into().expect("Failed to convert chunk");
-                *array = color.to_le_bytes();
-            });
-
         self.layer
             .wl_surface()
             .damage_buffer(0, 0, self.width as i32, self.height as i32);
         self.layer
             .wl_surface()
             .frame(qh, self.layer.wl_surface().clone());
-        buffer
-            .attach_to(self.layer.wl_surface())
-            .expect("Failed to attach buffer");
+        self.layer.wl_surface().attach(Some(&self.buffer), 0, 0);
         self.layer.commit();
 
         // TODO save and reuse buffer when the window size is unchanged.
@@ -244,12 +229,6 @@ impl SeatHandler for DimData {
     }
 }
 
-impl ShmHandler for DimData {
-    fn shm_state(&mut self) -> &mut Shm {
-        &mut self.shm
-    }
-}
-
 impl KeyboardHandler for DimData {
     fn enter(
         &mut self,
@@ -352,13 +331,10 @@ impl LayerShellHandler for DimData {
         configure: smithay_client_toolkit::shell::wlr_layer::LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        if configure.new_size.0 == 0 || configure.new_size.1 == 0 {
-            self.width = INIT_SIZE;
-            self.height = INIT_SIZE;
-        } else {
-            self.width = configure.new_size.0;
-            self.height = configure.new_size.1;
-        }
+        (self.width, self.height) = configure.new_size;
+
+        self.viewport
+            .set_destination(self.width as _, self.height as _);
 
         // Initiare first draw
         if self.first_configure {
@@ -375,7 +351,7 @@ delegate_pointer!(DimData);
 delegate_keyboard!(DimData);
 delegate_output!(DimData);
 delegate_seat!(DimData);
-delegate_shm!(DimData);
+delegate_simple!(DimData, WpViewporter, 1);
 
 impl ProvidesRegistryState for DimData {
     fn registry(&mut self) -> &mut RegistryState {
@@ -383,4 +359,52 @@ impl ProvidesRegistryState for DimData {
     }
 
     registry_handlers![OutputState, SeatState];
+}
+
+impl Dispatch<WpViewport, ()> for DimData {
+    fn event(
+        _: &mut Self,
+        _: &WpViewport,
+        _: wp_viewport::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        unreachable!("wp_single_pixel_buffer_manager_v1::Event is empty in version 1")
+    }
+}
+
+impl Dispatch<WpSinglePixelBufferManagerV1, ()> for DimData {
+    fn event(
+        _: &mut Self,
+        _: &WpSinglePixelBufferManagerV1,
+        _: wp_single_pixel_buffer_manager_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        unreachable!("wp_single_pixel_buffer_manager_v1::Event is empty in version 1")
+    }
+}
+impl Dispatch<WlBuffer, ()> for DimData {
+    fn event(
+        _: &mut Self,
+        _: &WlBuffer,
+        event: wl_buffer::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        match event {
+            wl_buffer::Event::Release => todo!(),
+            _ => todo!(),
+        }
+    }
+}
+
+impl Drop for DimData {
+    fn drop(&mut self) {
+        self.viewport.destroy();
+        self.buffer.destroy();
+    }
 }
