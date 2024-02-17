@@ -23,7 +23,7 @@ use smithay_client_toolkit::{
             },
         },
     },
-    registry::{ProvidesRegistryState, RegistryState},
+    registry::{ProvidesRegistryState, RegistryState, SimpleGlobal},
     registry_handlers,
     seat::{
         keyboard::KeyboardHandler,
@@ -59,7 +59,6 @@ impl DimData {
     pub fn new(
         globals: &GlobalList,
         qh: &QueueHandle<Self>,
-        buffer: WlBuffer,
         viewport: WpViewport,
         layer: LayerSurface,
     ) -> Self {
@@ -72,7 +71,13 @@ impl DimData {
             first_configure: true,
             width: INIT_SIZE,
             height: INIT_SIZE,
-            buffer,
+            buffer: {
+                SimpleGlobal::<WpSinglePixelBufferManagerV1, 1>::bind(globals, qh)
+                    .expect("wp_single_pixel_buffer_manager_v1 not available!")
+                    .get()
+                    .expect("Failed to get buffer manager")
+                    .create_u32_rgba_buffer(0, 0, 0, u32::MAX, qh, ())
+            },
             viewport,
             layer,
             keyboard: None,
@@ -95,6 +100,7 @@ impl DimData {
         self.layer.wl_surface().attach(Some(&self.buffer), 0, 0);
         self.layer.commit();
 
+        debug!("Drawn");
         // TODO save and reuse buffer when the window size is unchanged.
     }
 }
@@ -398,7 +404,7 @@ impl Dispatch<WlBuffer, ()> for DimData {
         _: &QueueHandle<Self>,
     ) {
         match event {
-            wl_buffer::Event::Release => todo!(),
+            wl_buffer::Event::Release => debug!("WlBuffer released"),
             _ => todo!(),
         }
     }

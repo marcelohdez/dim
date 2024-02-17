@@ -4,10 +4,7 @@ use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::{
         client::{globals::registry_queue_init, Connection},
-        protocols::wp::{
-            single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1,
-            viewporter::client::wp_viewporter,
-        },
+        protocols::wp::viewporter::client::wp_viewporter,
     },
     registry::SimpleGlobal,
     shell::{
@@ -26,21 +23,7 @@ fn main() -> anyhow::Result<()> {
     let qh = event_queue.handle();
 
     let compositor = CompositorState::bind(&globals, &qh).context("Compositor not available")?;
-    let single_pixel_mngr = SimpleGlobal::<WpSinglePixelBufferManagerV1, 1>::bind(&globals, &qh)
-        .context("wp_single_pixel_buffer_manager_v1 not available!")?;
-    let buffer = single_pixel_mngr
-        .get()
-        .context("Failed to get buffer manager")?
-        .create_u32_rgba_buffer(0, 0, 0, u32::MAX, &qh, ());
-
     let surface = compositor.create_surface(&qh);
-
-    let wp_viewporter = SimpleGlobal::<wp_viewporter::WpViewporter, 1>::bind(&globals, &qh)
-        .expect("wp_viewporter not available");
-    let viewport = wp_viewporter
-        .get()
-        .expect("wp_viewporter failed")
-        .get_viewport(&surface, &qh, ());
 
     let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
     let layer =
@@ -51,7 +34,13 @@ fn main() -> anyhow::Result<()> {
 
     layer.commit();
 
-    let mut data = DimData::new(&globals, &qh, buffer, viewport, layer);
+    let viewport = SimpleGlobal::<wp_viewporter::WpViewporter, 1>::bind(&globals, &qh)
+        .expect("wp_viewporter not available")
+        .get()
+        .expect("wp_viewporter failed")
+        .get_viewport(layer.wl_surface(), &qh, ());
+
+    let mut data = DimData::new(&globals, &qh, viewport, layer);
 
     loop {
         event_queue
