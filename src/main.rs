@@ -2,7 +2,7 @@ use std::{process, thread, time::Duration};
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use dim::{cli::DimOpts, dim::DimData};
+use dim::{cli::DimOpts, dim::DimData, DEFAULT_ALPHA, DEFAULT_DURATION};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::client::{globals::registry_queue_init, Connection},
@@ -21,9 +21,11 @@ fn main() -> anyhow::Result<()> {
 
     let compositor = CompositorState::bind(&globals, &qh).context("Compositor not available")?;
     let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
-    let mut data = DimData::new(compositor, &globals, &qh, layer_shell);
 
-    let duration = args.duration.unwrap_or(30);
+    let alpha = args.alpha.unwrap_or(DEFAULT_ALPHA);
+    let mut data = DimData::new(compositor, &globals, &qh, layer_shell, alpha);
+
+    let duration = args.duration.unwrap_or(DEFAULT_DURATION);
     thread::spawn(move || {
         thread::sleep(Duration::from_secs(duration));
         process::exit(0);

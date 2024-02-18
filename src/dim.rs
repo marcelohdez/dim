@@ -51,6 +51,7 @@ pub struct DimData {
     pixel_buffer_mgr: SimpleGlobal<WpSinglePixelBufferManagerV1, 1>,
     viewporter: SimpleGlobal<WpViewporter, 1>,
 
+    alpha: f32,
     views: HashMap<WlOutput, DimView>,
 
     exit: bool,
@@ -74,6 +75,7 @@ impl DimData {
         globals: &GlobalList,
         qh: &QueueHandle<Self>,
         layer_shell: LayerShell,
+        alpha: f32,
     ) -> Self {
         Self {
             compositor,
@@ -86,6 +88,7 @@ impl DimData {
             viewporter: SimpleGlobal::<wp_viewporter::WpViewporter, 1>::bind(globals, qh)
                 .expect("wp_viewporter not available"),
 
+            alpha,
             views: HashMap::new(),
 
             exit: false,
@@ -137,6 +140,7 @@ impl DimData {
             qh,
             viewport,
             layer,
+            self.alpha,
         )
     }
 }
@@ -147,12 +151,16 @@ impl DimView {
         qh: &QueueHandle<DimData>,
         viewport: WpViewport,
         layer: LayerSurface,
+        alpha: f32,
     ) -> Self {
+        // pre-multiply alpha
+        let alpha = (u32::MAX as f32 * alpha) as u32;
+
         Self {
             first_configure: true,
             width: INIT_SIZE,
             height: INIT_SIZE,
-            buffer: mgr.create_u32_rgba_buffer(0, 0, 0, u32::MAX, qh, ()),
+            buffer: mgr.create_u32_rgba_buffer(0, 0, 0, alpha, qh, ()),
             viewport,
             layer,
         }

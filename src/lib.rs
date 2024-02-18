@@ -5,3 +5,5 @@ pub mod dim;
 pub const INIT_SIZE: u32 = 100;
 /// Default duration in seconds
 pub const DEFAULT_DURATION: u64 = 30;
+
+pub const DEFAULT_ALPHA: f32 = 0.5;
