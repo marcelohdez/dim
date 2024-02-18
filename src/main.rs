@@ -1,7 +1,8 @@
 use std::{process, thread, time::Duration};
 
 use anyhow::{anyhow, Context};
-use dim::dim::DimData;
+use clap::Parser;
+use dim::{cli::DimOpts, dim::DimData};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::client::{globals::registry_queue_init, Connection},
@@ -10,6 +11,7 @@ use smithay_client_toolkit::{
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
+    let args = DimOpts::parse();
 
     let conn = Connection::connect_to_env().context("Failed to connect to environment")?;
 
@@ -21,8 +23,9 @@ fn main() -> anyhow::Result<()> {
     let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
     let mut data = DimData::new(compositor, &globals, &qh, layer_shell);
 
-    thread::spawn(|| {
-        thread::sleep(Duration::from_secs(30));
+    let duration = args.duration.unwrap_or(30);
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(duration));
         process::exit(0);
     });
 
