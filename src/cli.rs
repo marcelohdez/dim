@@ -3,7 +3,11 @@ use clap::Parser;
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
 pub struct DimOpts {
-    #[arg(short, long, help = "Duration in seconds")]
+    #[arg(
+        short,
+        long,
+        help = "Duration in seconds, 0 is infinite, default is 30"
+    )]
     pub duration: Option<u64>,
 
     #[arg(

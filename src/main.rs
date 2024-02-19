@@ -26,10 +26,13 @@ fn main() -> anyhow::Result<()> {
     let mut data = DimData::new(compositor, &globals, &qh, layer_shell, alpha);
 
     let duration = args.duration.unwrap_or(DEFAULT_DURATION);
-    thread::spawn(move || {
-        thread::sleep(Duration::from_secs(duration));
-        process::exit(0);
-    });
+    if duration > 0 {
+        // A duration of 0 is considered as infinite, not starting the timer:
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(duration));
+            process::exit(0);
+        });
+    }
 
     while !data.should_exit() {
         event_queue
