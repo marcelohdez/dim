@@ -15,3 +15,9 @@ clap = { version = "4.5.1", features = ["derive"] }
 env_logger = "0.11.2"
 log = "0.4.20"
 smithay-client-toolkit = "0.18.1"
+
+[profile.release]
+lto = true
+strip = true
+panic = "abort"
+codegen-units = 1
