@@ -2,7 +2,10 @@ use std::{process, thread, time::Duration};
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use dim::{cli::DimOpts, dim::DimData, DEFAULT_ALPHA, DEFAULT_DURATION};
+use dim::{
+    cli::{DimOpts, DEFAULT_ALPHA, DEFAULT_DURATION},
+    dim::DimData,
+};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::client::{globals::registry_queue_init, Connection},
