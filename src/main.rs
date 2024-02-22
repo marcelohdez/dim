@@ -2,7 +2,7 @@ use std::{process, thread, time::Duration};
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use dim::{
+use dim_screen::{
     cli::{DimOpts, DEFAULT_ALPHA, DEFAULT_DURATION},
     dim::DimData,
 };
