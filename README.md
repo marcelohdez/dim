@@ -28,9 +28,16 @@ dim --help
 
 ## Installing
 
-### Building Manually
+Ensure you have [Rust] installed.
 
-_Currently the only way to install_, ensure you have [Rust] installed.
+dim is available on crates.io as `dim-screen` to avoid naming conflicts but
+the binary is still `dim`:
+
+```bash
+cargo install dim-screen
+```
+
+### Building Manually
 
 Choose a directory for this repo, then clone and `cd` into it:
 
@@ -39,7 +46,8 @@ git clone https://github.com/marcelohdez/dim
 cd dim
 ```
 
-Lastly, `cargo` can install `dim` for you, placing the binary in `$HOME/.cargo/bin/`:
+Lastly, `cargo` can build and install `dim` for you, placing the binary in
+`$HOME/.cargo/bin/`:
 
 ```bash
 cargo install --path .
@@ -51,7 +59,7 @@ Or, if you would like to place the binary in your `$PATH` yourself:
 cargo build -r
 ```
 
-And the resulting binary should be in `./targer/release/dim`.
+And the resulting binary should be in `./target/release/dim`.
 
 ## License
 

@@ -120,13 +120,12 @@ impl DimData {
             .info(output)
             .and_then(|info| info.logical_size)
         {
-            // FIXME: assuming other layershells like waybar are <= 32 px thick,
-            // as dim is moved by them so just using the screen size will leave gaps
-            (width as u32 + 32, height as u32 + 32)
+            (width as u32, height as u32)
         } else {
             (INIT_SIZE, INIT_SIZE)
         };
 
+        layer.set_exclusive_zone(-1);
         layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
         layer.set_size(width, height);
 

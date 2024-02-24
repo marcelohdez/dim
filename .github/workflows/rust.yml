@@ -1,0 +1,28 @@
+name: Rust
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev
+      - name: Lint
+        uses: wearerequired/lint-action@v2
+        with:
+          clippy: true
+          rustfmt: true
+      - name: Run tests
+        run: cargo test --verbose

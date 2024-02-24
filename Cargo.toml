@@ -1,5 +1,5 @@
 [package]
-name = "dim"
+name = "dim-screen"
 authors = ["Marcelo Hernandez <marcelohdez.inq@gmail.com>"]
 description = "Native Wayland screen dimming tool"
 homepage = "https://github.com/marcelohdez/dim"
@@ -9,12 +9,20 @@ keywords = ["wayland", "smithay"]
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "dim"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.79"
 clap = { version = "4.5.1", features = ["derive"] }
 env_logger = "0.11.2"
 log = "0.4.20"
 smithay-client-toolkit = "0.18.1"
+
+[build-dependencies]
+clap = { version = "4.5.1", features = ["derive"] }
+clap_complete = "4.5.1"
 
 [profile.release]
 lto = true
