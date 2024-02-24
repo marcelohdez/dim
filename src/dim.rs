@@ -4,7 +4,7 @@ use log::{debug, error};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_simple,
+    delegate_registry, delegate_seat, delegate_simple, delegate_touch,
     output::{OutputHandler, OutputState},
     reexports::{
         client::{
@@ -13,7 +13,7 @@ use smithay_client_toolkit::{
                 wl_buffer::{self, WlBuffer},
                 wl_keyboard,
                 wl_output::WlOutput,
-                wl_pointer,
+                wl_pointer, wl_touch,
             },
             Connection, Dispatch, QueueHandle,
         },
@@ -32,6 +32,7 @@ use smithay_client_toolkit::{
     seat::{
         keyboard::KeyboardHandler,
         pointer::{PointerEvent, PointerEventKind, PointerHandler},
+        touch::TouchHandler,
         Capability, SeatHandler, SeatState,
     },
     shell::{
@@ -58,6 +59,7 @@ pub struct DimData {
     keyboard: Option<wl_keyboard::WlKeyboard>,
     keyboard_focus: bool,
     pointer: Option<wl_pointer::WlPointer>,
+    touch: Option<wl_touch::WlTouch>,
 }
 
 struct DimView {
@@ -95,6 +97,7 @@ impl DimData {
             keyboard: None,
             keyboard_focus: true,
             pointer: None,
+            touch: None,
         }
     }
 
@@ -323,7 +326,13 @@ impl SeatHandler for DimData {
                         .expect("Failed to get pointer"),
                 )
             }
-            Capability::Touch => todo!(),
+            Capability::Touch => {
+                self.touch = Some(
+                    self.seat_state
+                        .get_touch(qh, &seat)
+                        .expect("Failed to get touch device!"),
+                )
+            }
             _ => debug!("Unknown capability found: {capability}"),
         }
     }
@@ -346,8 +355,12 @@ impl SeatHandler for DimData {
                 .take()
                 .expect("Failed to remove pointer!")
                 .release(),
-            Capability::Touch => todo!(),
-            _ => todo!(),
+            Capability::Touch => self
+                .touch
+                .take()
+                .expect("Failed to remove touch device!")
+                .release(),
+            _ => debug!("Unknown capability removed: {capability}"),
         }
     }
 
@@ -445,7 +458,7 @@ impl PointerHandler for DimData {
         for e in events {
             match e.kind {
                 PointerEventKind::Enter { .. } | PointerEventKind::Leave { .. } => {
-                    debug!("Mouse left or entered!")
+                    debug!("Mouse focus changed!")
                 }
                 _ => self.exit = true,
             }
@@ -453,7 +466,75 @@ impl PointerHandler for DimData {
     }
 }
 
+impl TouchHandler for DimData {
+    fn down(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &wl_touch::WlTouch,
+        _serial: u32,
+        _time: u32,
+        _surface: smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _id: i32,
+        _position: (f64, f64),
+    ) {
+        self.exit = true;
+    }
+
+    fn up(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &wl_touch::WlTouch,
+        _serial: u32,
+        _time: u32,
+        _id: i32,
+    ) {
+        self.exit = true;
+    }
+
+    fn motion(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &wl_touch::WlTouch,
+        _time: u32,
+        _id: i32,
+        _position: (f64, f64),
+    ) {
+        self.exit = true;
+    }
+
+    fn shape(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &wl_touch::WlTouch,
+        _id: i32,
+        _major: f64,
+        _minor: f64,
+    ) {
+        self.exit = true;
+    }
+
+    fn orientation(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _touch: &wl_touch::WlTouch,
+        _id: i32,
+        _orientation: f64,
+    ) {
+        self.exit = true;
+    }
+
+    fn cancel(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _touch: &wl_touch::WlTouch) {
+        self.exit = true;
+    }
+}
+
 delegate_compositor!(DimData);
+delegate_touch!(DimData);
 delegate_layer!(DimData);
 delegate_registry!(DimData);
 delegate_pointer!(DimData);
@@ -506,7 +587,7 @@ impl Dispatch<WlBuffer, ()> for DimData {
     ) {
         match event {
             wl_buffer::Event::Release => debug!("WlBuffer released"),
-            _ => todo!(),
+            _ => unreachable!("WlBuffer only has Release event"),
         }
     }
 }
