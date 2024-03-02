@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use log::{debug, error};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
@@ -53,7 +51,7 @@ pub struct DimData {
     viewporter: SimpleGlobal<WpViewporter, 1>,
 
     alpha: f32,
-    views: HashMap<WlOutput, DimView>,
+    views: Vec<DimView>,
 
     exit: bool,
     keyboard: Option<wl_keyboard::WlKeyboard>,
@@ -69,6 +67,7 @@ struct DimView {
     buffer: WlBuffer,
     viewport: WpViewport,
     layer: LayerSurface,
+    output: WlOutput,
 }
 
 impl DimData {
@@ -91,7 +90,7 @@ impl DimData {
                 .expect("wp_viewporter not available"),
 
             alpha,
-            views: HashMap::new(),
+            views: Vec::new(),
 
             exit: false,
             keyboard: None,
@@ -105,19 +104,18 @@ impl DimData {
         self.exit
     }
 
-    fn create_view(&self, qh: &QueueHandle<Self>, output: &WlOutput) -> DimView {
-        let surface = self.compositor.create_surface(qh);
+    fn create_view(&self, qh: &QueueHandle<Self>, output: WlOutput) -> DimView {
         let layer = self.layer_shell.create_layer_surface(
             qh,
-            surface,
+            self.compositor.create_surface(qh),
             Layer::Overlay,
             Some("dim_layer"),
-            Some(output),
+            Some(&output),
         );
 
         let (width, height) = if let Some((width, height)) = self
             .output_state
-            .info(output)
+            .info(&output)
             .and_then(|info| info.logical_size)
         {
             (width as u32, height as u32)
@@ -128,7 +126,6 @@ impl DimData {
         layer.set_exclusive_zone(-1);
         layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
         layer.set_size(width, height);
-
         layer.commit();
 
         let viewport = self
@@ -137,34 +134,34 @@ impl DimData {
             .expect("wp_viewporter failed")
             .get_viewport(layer.wl_surface(), qh, ());
 
-        DimView::new(
-            self.pixel_buffer_mgr.get().expect("failed to get buffer"),
-            qh,
-            viewport,
-            layer,
-            self.alpha,
-        )
+        // pre-multiply alpha
+        let alpha = (u32::MAX as f32 * self.alpha) as u32;
+        let buffer = self
+            .pixel_buffer_mgr
+            .get()
+            .expect("failed to get buffer")
+            .create_u32_rgba_buffer(0, 0, 0, alpha, qh, ());
+
+        DimView::new(qh, buffer, viewport, layer, output)
     }
 }
 
 impl DimView {
     fn new(
-        mgr: &WpSinglePixelBufferManagerV1,
-        qh: &QueueHandle<DimData>,
+        _qh: &QueueHandle<DimData>,
+        buffer: WlBuffer,
         viewport: WpViewport,
         layer: LayerSurface,
-        alpha: f32,
+        output: WlOutput,
     ) -> Self {
-        // pre-multiply alpha
-        let alpha = (u32::MAX as f32 * alpha) as u32;
-
         Self {
             first_configure: true,
             width: INIT_SIZE,
             height: INIT_SIZE,
-            buffer: mgr.create_u32_rgba_buffer(0, 0, 0, alpha, qh, ()),
+            buffer,
             viewport,
             layer,
+            output,
         }
     }
 
@@ -206,7 +203,7 @@ impl LayerShellHandler for DimData {
         configure: smithay_client_toolkit::shell::wlr_layer::LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        let Some(view) = self.views.values_mut().find(|view| &view.layer == layer) else {
+        let Some(view) = self.views.iter_mut().find(|view| &view.layer == layer) else {
             error!("Configuring layer not in self.views?");
             return;
         };
@@ -249,7 +246,7 @@ impl CompositorHandler for DimData {
         _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _time: u32,
     ) {
-        for view in self.views.values_mut() {
+        for view in &mut self.views {
             view.draw(qh);
         }
     }
@@ -266,8 +263,7 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        let view = self.create_view(qh, &output);
-        self.views.insert(output, view);
+        self.views.push(self.create_view(qh, output));
     }
 
     fn update_output(
@@ -276,9 +272,13 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        self.views.remove(&output);
-        let view = self.create_view(qh, &output);
-        self.views.insert(output, view);
+        let new_view = self.create_view(qh, output);
+
+        if let Some(view) = self.views.iter_mut().find(|v| v.output == new_view.output) {
+            *view = new_view;
+        } else {
+            error!("Updating output not in views list??");
+        }
     }
 
     fn output_destroyed(
@@ -287,7 +287,7 @@ impl OutputHandler for DimData {
         _qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        self.views.remove(&output);
+        self.views.retain(|v| v.output != output);
     }
 }
 
@@ -386,7 +386,7 @@ impl KeyboardHandler for DimData {
     ) {
         if self
             .views
-            .values()
+            .iter()
             .any(|view| view.layer.wl_surface() == surface)
         {
             debug!("Gained keyboard focus");
@@ -404,7 +404,7 @@ impl KeyboardHandler for DimData {
     ) {
         if self
             .views
-            .values()
+            .iter()
             .any(|view| view.layer.wl_surface() == surface)
         {
             debug!("Lost keyboard focus");
