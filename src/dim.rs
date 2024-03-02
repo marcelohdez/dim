@@ -53,11 +53,10 @@ pub struct DimData {
     alpha: f32,
     views: Vec<DimView>,
 
-    exit: bool,
     keyboard: Option<wl_keyboard::WlKeyboard>,
-    keyboard_focus: bool,
     pointer: Option<wl_pointer::WlPointer>,
     touch: Option<wl_touch::WlTouch>,
+    exit: bool,
 }
 
 struct DimView {
@@ -94,7 +93,6 @@ impl DimData {
 
             exit: false,
             keyboard: None,
-            keyboard_focus: true,
             pointer: None,
             touch: None,
         }
@@ -379,19 +377,11 @@ impl KeyboardHandler for DimData {
         _conn: &smithay_client_toolkit::reexports::client::Connection,
         _qh: &QueueHandle<Self>,
         _keyboard: &wl_keyboard::WlKeyboard,
-        surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _serial: u32,
         _raw: &[u32],
         _keysyms: &[smithay_client_toolkit::seat::keyboard::Keysym],
     ) {
-        if self
-            .views
-            .iter()
-            .any(|view| view.layer.wl_surface() == surface)
-        {
-            debug!("Gained keyboard focus");
-            self.keyboard_focus = true;
-        }
     }
 
     fn leave(
@@ -399,17 +389,9 @@ impl KeyboardHandler for DimData {
         _conn: &smithay_client_toolkit::reexports::client::Connection,
         _qh: &QueueHandle<Self>,
         _keyboard: &wl_keyboard::WlKeyboard,
-        surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _serial: u32,
     ) {
-        if self
-            .views
-            .iter()
-            .any(|view| view.layer.wl_surface() == surface)
-        {
-            debug!("Lost keyboard focus");
-            self.keyboard_focus = false;
-        }
     }
 
     fn press_key(
@@ -457,9 +439,7 @@ impl PointerHandler for DimData {
     ) {
         for e in events {
             match e.kind {
-                PointerEventKind::Enter { .. } | PointerEventKind::Leave { .. } => {
-                    debug!("Mouse focus changed!")
-                }
+                PointerEventKind::Enter { .. } | PointerEventKind::Leave { .. } => (),
                 _ => self.exit = true,
             }
         }
