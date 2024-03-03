@@ -163,18 +163,13 @@ impl DimView {
         }
     }
 
-    fn draw(&mut self, qh: &QueueHandle<DimData>) {
+    fn draw(&mut self, _qh: &QueueHandle<DimData>) {
+        debug!("Requesting draw");
         if !self.first_configure {
             // we only need to draw once as it is a static color
             return;
         }
 
-        self.layer
-            .wl_surface()
-            .damage_buffer(0, 0, self.width as i32, self.height as i32);
-        self.layer
-            .wl_surface()
-            .frame(qh, self.layer.wl_surface().clone());
         self.layer.wl_surface().attach(Some(&self.buffer), 0, 0);
         self.layer.commit();
 
@@ -240,13 +235,10 @@ impl CompositorHandler for DimData {
     fn frame(
         &mut self,
         _conn: &smithay_client_toolkit::reexports::client::Connection,
-        qh: &QueueHandle<Self>,
+        _qh: &QueueHandle<Self>,
         _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _time: u32,
     ) {
-        for view in &mut self.views {
-            view.draw(qh);
-        }
     }
 }
 
@@ -440,7 +432,10 @@ impl PointerHandler for DimData {
         for e in events {
             match e.kind {
                 PointerEventKind::Enter { .. } | PointerEventKind::Leave { .. } => (),
-                _ => self.exit = true,
+                _ => {
+                    debug!("Mouse event");
+                    self.exit = true;
+                }
             }
         }
     }
