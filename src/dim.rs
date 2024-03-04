@@ -465,7 +465,6 @@ impl TouchHandler for DimData {
         _time: u32,
         _id: i32,
     ) {
-        self.exit = true;
     }
 
     fn motion(
@@ -477,7 +476,6 @@ impl TouchHandler for DimData {
         _id: i32,
         _position: (f64, f64),
     ) {
-        self.exit = true;
     }
 
     fn shape(
@@ -489,7 +487,6 @@ impl TouchHandler for DimData {
         _major: f64,
         _minor: f64,
     ) {
-        self.exit = true;
     }
 
     fn orientation(
@@ -500,12 +497,9 @@ impl TouchHandler for DimData {
         _id: i32,
         _orientation: f64,
     ) {
-        self.exit = true;
     }
 
-    fn cancel(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _touch: &wl_touch::WlTouch) {
-        self.exit = true;
-    }
+    fn cancel(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _touch: &wl_touch::WlTouch) {}
 }
 
 delegate_compositor!(DimData);
