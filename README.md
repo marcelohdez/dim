@@ -5,7 +5,7 @@ Native Wayland screen dimming tool
 ## Usage
 
 After [installing], you may run `dim` before you would run your locker, when
-you want the screen to dim for a period, e.g. in your [swayidle] config:
+you want the screen to dim for a period, e.g. in your [swayidle] config/command:
 
 ```bash
 timeout 270 'dim && swaylock'
@@ -28,7 +28,12 @@ dim --help
 
 ## Installing
 
-Ensure you have [Rust] installed.
+> [!NOTE]
+>
+> - Ensure you have [Rust] installed.
+> - The system libraries `libxkbcommon` and `libwayland` are required.
+> - A Wayland compositor supporting the [single pixel buffer protocol] is
+>   required e.g. Sway 1.8+, river, Hyprland.
 
 dim is available on crates.io as `dim-screen` to avoid naming conflicts but
 the binary is still `dim`:
@@ -71,4 +76,5 @@ more information, please refer to the [LICENSE] file in the repository root.
 [swaylock]: https://github.com/swaywm/swaylock
 [submit an issue]: https://github.com/marcelohdez/dim/issues
 [Rust]: https://www.rust-lang.org/
+[single pixel buffer protocol]: https://wayland.app/protocols/single-pixel-buffer-v1
 [LICENSE]: https://github.com/marcelohdez/dim/blob/master/LICENSE
