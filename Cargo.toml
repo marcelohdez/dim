@@ -6,7 +6,7 @@ homepage = "https://github.com/marcelohdez/dim"
 license = "GPL-3.0-only"
 keywords = ["wayland", "smithay"]
 
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 
 [[bin]]
