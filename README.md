@@ -4,6 +4,10 @@ Native Wayland screen dimming tool
 
 ## Usage
 
+> [!NOTE]
+> A Wayland compositor supporting the [single pixel buffer protocol] is
+>   required e.g. Sway 1.8+, river, Hyprland.
+
 After [installing], you may run `dim` before you would run your locker, when
 you want the screen to dim for a period, e.g. in your [swayidle] config/command:
 
@@ -28,15 +32,25 @@ dim --help
 
 ## Installing
 
-> [!NOTE]
+dim packages are titled as `dim-screen` to avoid naming conflicts.
+
+### Fedora (COPR)
+
+dim is available in Fedora as a COPR:
+
+```bash
+dnf copr enable marcelohdez/dim
+dnf install dim-screen
+```
+
+### Others
+
+> [!IMPORTANT]
 >
 > - Ensure you have [Rust] installed.
 > - The system libraries `libxkbcommon` and `libwayland` are required.
-> - A Wayland compositor supporting the [single pixel buffer protocol] is
->   required e.g. Sway 1.8+, river, Hyprland.
 
-dim is available on crates.io as `dim-screen` to avoid naming conflicts but
-the binary is still `dim`:
+dim is available on crates.io:
 
 ```bash
 cargo install dim-screen
