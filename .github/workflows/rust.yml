@@ -24,5 +24,7 @@ jobs:
         with:
           clippy: true
           rustfmt: true
-      - name: Run tests
-        run: cargo test --verbose
+      - name: Build locked
+        run: cargo build --locked --verbose
+      - name: Test locked
+        run: cargo test --locked --verbose
