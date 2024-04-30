@@ -6,7 +6,7 @@ Native Wayland screen dimming tool
 
 > [!NOTE]
 > A Wayland compositor supporting the [single pixel buffer protocol] is
->   required e.g. Sway 1.8+, river, Hyprland.
+> required e.g. Sway 1.8+, river, Hyprland.
 
 After [installing], you may run `dim` before you would run your locker, when
 you want the screen to dim for a period, e.g. in your [swayidle] config/command:
@@ -36,11 +36,20 @@ dim packages are titled as `dim-screen` to avoid naming conflicts.
 
 ### Fedora (COPR)
 
-dim is available in Fedora as a COPR:
+dim is available in Fedora as a [COPR]:
 
 ```bash
-dnf copr enable marcelohdez/dim
-dnf install dim-screen
+sudo dnf copr enable marcelohdez/dim
+sudo dnf install dim-screen
+```
+
+### Arch (AUR)
+
+For Arch, dim is available in the [AUR]. You may use your
+preferred [AUR helper] like so:
+
+```bash
+paru -S dim-screen
 ```
 
 ### Others
@@ -85,6 +94,9 @@ And the resulting binary should be in `./target/release/dim`.
 `dim` is licensed under the GPLv3 license, a free and open source license. For
 more information, please refer to the [LICENSE] file in the repository root.
 
+[AUR]: https://aur.archlinux.org/packages/dim-screen
+[AUR helper]: https://wiki.archlinux.org/title/AUR_helpers
+[COPR]: https://copr.fedorainfracloud.org/coprs/marcelohdez/dim
 [installing]: https://github.com/marcelohdez/dim/#installing
 [swayidle]: https://github.com/swaywm/swayidle
 [swaylock]: https://github.com/swaywm/swaylock
