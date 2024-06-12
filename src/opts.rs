@@ -8,10 +8,8 @@ use std::{
 use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate_to, Shell};
 
-/// Default duration in seconds
-pub const DEFAULT_DURATION: u64 = 30;
-
-pub const DEFAULT_ALPHA: f32 = 0.5;
+const DEFAULT_DURATION: u64 = 30;
+const DEFAULT_ALPHA: f32 = 0.5;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
@@ -19,16 +17,18 @@ pub struct DimOpts {
     #[arg(
         short,
         long,
-        help = format!("Duration in seconds, 0 is infinite, default is {DEFAULT_DURATION}")
+        default_value_t = DEFAULT_DURATION,
+        help = "Duration in seconds, 0 is infinite"
     )]
-    pub duration: Option<u64>,
+    pub duration: u64,
 
     #[arg(
         short,
         long,
-        help = format!("0.0 is transparent, 1.0 is opaque, default is {DEFAULT_ALPHA}")
+        default_value_t = DEFAULT_ALPHA,
+        help = "0.0 is transparent, 1.0 is opaque"
     )]
-    pub alpha: Option<f32>,
+    pub alpha: f32,
 
     #[arg(long, value_name = "PATH", help = "Generate completions at given path")]
     pub gen_completions: Option<PathBuf>,
