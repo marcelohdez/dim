@@ -97,10 +97,10 @@ more information, please refer to the [LICENSE] file in the repository root.
 [AUR]: https://aur.archlinux.org/packages/dim-screen
 [AUR helper]: https://wiki.archlinux.org/title/AUR_helpers
 [COPR]: https://copr.fedorainfracloud.org/coprs/marcelohdez/dim
-[installing]: https://github.com/marcelohdez/dim/#installing
+[installing]: #installing
 [swayidle]: https://github.com/swaywm/swayidle
 [swaylock]: https://github.com/swaywm/swaylock
 [submit an issue]: https://github.com/marcelohdez/dim/issues
 [Rust]: https://www.rust-lang.org/
 [single pixel buffer protocol]: https://wayland.app/protocols/single-pixel-buffer-v1
-[LICENSE]: https://github.com/marcelohdez/dim/blob/master/LICENSE
+[LICENSE]: LICENSE
