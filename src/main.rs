@@ -3,8 +3,8 @@ use std::{process, thread, time::Duration};
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use dim_screen::{
-    cli::{DimOpts, DEFAULT_ALPHA, DEFAULT_DURATION},
     dim::DimData,
+    opts::{DimOpts, DEFAULT_ALPHA, DEFAULT_DURATION},
 };
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -15,6 +15,11 @@ use smithay_client_toolkit::{
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = DimOpts::parse();
+
+    if let Some(path) = args.gen_completions {
+        DimOpts::generate_completions(Some(&path))?;
+        return Ok(());
+    }
 
     let conn = Connection::connect_to_env().context("Failed to connect to environment")?;
 
