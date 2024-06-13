@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
     let args = DimOpts::parse();
 
     if let Some(path) = args.gen_completions {
-        DimOpts::generate_completions(Some(&path))?;
+        DimOpts::generate_completions(&path)?;
         return Ok(());
     }
 

@@ -1,9 +1,4 @@
-use std::{
-    borrow::Cow,
-    env,
-    ops::Deref,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate_to, Shell};
@@ -35,17 +30,12 @@ pub struct DimOpts {
 }
 
 impl DimOpts {
-    pub fn generate_completions(at: Option<&Path>) -> anyhow::Result<()> {
+    pub fn generate_completions(dir: &Path) -> anyhow::Result<()> {
         let mut cli = Self::command();
 
-        let dir = match at {
-            Some(dir) => Cow::Borrowed(dir),
-            None => Cow::Owned(env::current_dir()?),
-        };
-
         for &shell in Shell::value_variants() {
-            let comp_file = generate_to(shell, &mut cli, "dim", dir.deref())?;
-            println!("cargo:warning=generated completion for {shell}: {comp_file:?}");
+            let comp_file = generate_to(shell, &mut cli, "dim", dir)?;
+            println!("Generated completion for {shell} at {comp_file:?}");
         }
 
         Ok(())
