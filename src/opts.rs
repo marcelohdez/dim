@@ -3,10 +3,7 @@ use std::path::{Path, PathBuf};
 use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate_to, Shell};
 
-/// Default duration in seconds
-pub const DEFAULT_DURATION: u64 = 30;
-
-pub const DEFAULT_ALPHA: f32 = 0.5;
+use crate::{DEFAULT_ALPHA, DEFAULT_DURATION};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
@@ -14,14 +11,14 @@ pub struct DimOpts {
     #[arg(
         short,
         long,
-        help = format!("Duration in seconds, 0 is infinite, default is {DEFAULT_DURATION}")
+        help = format!("Duration in seconds, 0 is infinite, [default: {DEFAULT_DURATION}]")
     )]
     pub duration: Option<u64>,
 
     #[arg(
         short,
         long,
-        help = format!("0.0 is transparent, 1.0 is opaque, default is {DEFAULT_ALPHA}")
+        help = format!("0.0 is transparent, 1.0 is opaque, [default: {DEFAULT_ALPHA}]")
     )]
     pub alpha: Option<f32>,
 

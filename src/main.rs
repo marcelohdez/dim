@@ -2,10 +2,7 @@ use std::{process, thread, time::Duration};
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use dim_screen::{
-    dim::DimData,
-    opts::{DimOpts, DEFAULT_ALPHA, DEFAULT_DURATION},
-};
+use dim_screen::{dim::DimData, opts::DimOpts, DEFAULT_ALPHA, DEFAULT_DURATION};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::client::{globals::registry_queue_init, Connection},
@@ -31,9 +28,8 @@ fn main() -> anyhow::Result<()> {
     let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
 
     let alpha = args.alpha.unwrap_or(DEFAULT_ALPHA);
-    let mut data = DimData::new(compositor, &globals, &qh, layer_shell, alpha);
-
     let duration = args.duration.unwrap_or(DEFAULT_DURATION);
+
     // A duration of 0 is considered as infinite, not starting the timer:
     if duration > 0 {
         thread::spawn(move || {
@@ -42,6 +38,7 @@ fn main() -> anyhow::Result<()> {
         });
     }
 
+    let mut data = DimData::new(compositor, &globals, &qh, layer_shell, alpha);
     while !data.should_exit() {
         event_queue
             .blocking_dispatch(&mut data)
