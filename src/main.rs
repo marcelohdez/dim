@@ -1,8 +1,10 @@
-use std::{process, thread, time::Duration};
+use std::{fs::File, io::read_to_string, process, thread, time::Duration};
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use clap::Parser;
-use dim_screen::{dim::DimData, opts::DimOpts, DEFAULT_ALPHA, DEFAULT_DURATION};
+use dim_screen::{dim::DimData, opts::DimOpts, CONFIG_FILENAME, DEFAULT_ALPHA, DEFAULT_DURATION};
+use directories::ProjectDirs;
+use log::{debug, info};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     reexports::client::{globals::registry_queue_init, Connection},
@@ -18,6 +20,24 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    let Some(dirs) = ProjectDirs::from("com", "marcelohdez", "dim") else {
+        bail!("Could not generate project directories on this OS?");
+    };
+    let config_dir = dirs.config_dir().join(CONFIG_FILENAME);
+
+    let opts = if config_dir.exists() {
+        debug!("Config file found at {config_dir:?}");
+
+        let file = File::open(config_dir)?;
+        let config: DimOpts = toml::from_str(&read_to_string(file)?)?;
+
+        debug!("Config: {config:?}");
+        config.merge_onto_self(args)
+    } else {
+        info!("Config file not found!");
+        args
+    };
+
     let conn = Connection::connect_to_env().context("Failed to connect to environment")?;
 
     let (globals, mut event_queue) =
@@ -27,8 +47,9 @@ fn main() -> anyhow::Result<()> {
     let compositor = CompositorState::bind(&globals, &qh).context("Compositor not available")?;
     let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
 
-    let alpha = args.alpha.unwrap_or(DEFAULT_ALPHA);
-    let duration = args.duration.unwrap_or(DEFAULT_DURATION);
+    debug!("Using options: {opts:?}");
+    let alpha = opts.alpha.unwrap_or(DEFAULT_ALPHA);
+    let duration = opts.duration.unwrap_or(DEFAULT_DURATION);
 
     // A duration of 0 is considered as infinite, not starting the timer:
     if duration > 0 {
