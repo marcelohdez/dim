@@ -2,29 +2,28 @@ use std::path::{Path, PathBuf};
 
 use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate_to, Shell};
+use serde::Deserialize;
 
-const DEFAULT_DURATION: u64 = 30;
-const DEFAULT_ALPHA: f32 = 0.5;
+use crate::{DEFAULT_ALPHA, DEFAULT_DURATION};
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Deserialize, Parser)]
 #[command(author, version, about)]
 pub struct DimOpts {
     #[arg(
         short,
         long,
-        default_value_t = DEFAULT_DURATION,
-        help = "Duration in seconds, 0 is infinite"
+        help = format!("Duration in seconds, 0 is infinite, [default: {DEFAULT_DURATION}]")
     )]
-    pub duration: u64,
+    pub duration: Option<u64>,
 
     #[arg(
         short,
         long,
-        default_value_t = DEFAULT_ALPHA,
-        help = "0.0 is transparent, 1.0 is opaque"
+        help = format!("0.0 is transparent, 1.0 is opaque, [default: {DEFAULT_ALPHA}]")
     )]
-    pub alpha: f32,
+    pub alpha: Option<f32>,
 
+    #[serde(skip)]
     #[arg(long, value_name = "PATH", help = "Generate completions at given path")]
     pub gen_completions: Option<PathBuf>,
 }
@@ -39,5 +38,17 @@ impl DimOpts {
         }
 
         Ok(())
+    }
+}
+
+impl DimOpts {
+    /// Merge other onto self, with other's values taking precedent
+    pub fn merge_onto_self(self, other: DimOpts) -> Self {
+        Self {
+            duration: other.duration.or(self.duration),
+            alpha: other.alpha.or(self.alpha),
+
+            ..self
+        }
     }
 }
