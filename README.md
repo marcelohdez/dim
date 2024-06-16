@@ -20,11 +20,12 @@ for the default of `30` seconds, then if no input is detected the next
 command will proceed, in this case [swaylock] will lock your screen.
 
 `dim` should only finish **successfully** when no input is detected for the
-duration given with the `--duration` command, which is 30 by default. If
-`dim` finishes successfully before this duration, please [submit an issue].
+duration. If `dim` finishes successfully before this duration, please [submit
+an issue].
 
-The alpha of `dim` may be configured with the `--alpha` option. For more info,
-please see:
+The alpha and duration of `dim` may be configured with either a config file
+located at `~/.config/dim/config.toml`, or through arguments at call-time, for
+all options and their defaults please see:
 
 ```bash
 dim --help
