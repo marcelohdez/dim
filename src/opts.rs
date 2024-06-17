@@ -26,6 +26,10 @@ pub struct DimOpts {
     #[serde(skip)]
     #[arg(long, value_name = "PATH", help = "Generate completions at given path")]
     pub gen_completions: Option<PathBuf>,
+
+    #[serde(skip)]
+    #[arg(short, long, value_name = "PATH", help = "Use config at path")]
+    pub config: Option<PathBuf>,
 }
 
 impl DimOpts {
@@ -39,9 +43,7 @@ impl DimOpts {
 
         Ok(())
     }
-}
 
-impl DimOpts {
     /// Merge other onto self, with other's values taking precedent
     pub fn merge_onto_self(self, other: DimOpts) -> Self {
         Self {

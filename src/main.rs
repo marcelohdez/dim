@@ -1,4 +1,4 @@
-use std::{fs::File, io::read_to_string, process, thread, time::Duration};
+use std::{borrow::Cow, fs::File, io::read_to_string, path::Path, process, thread, time::Duration};
 
 use anyhow::{anyhow, bail, Context};
 use clap::Parser;
@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let opts = match get_config()? {
+    let opts = match get_config(args.config.as_deref())? {
         Some(config) => config.merge_onto_self(args),
         None => args,
     };
@@ -47,20 +47,23 @@ fn main() -> anyhow::Result<()> {
     Err(anyhow!("Some user input was detected!"))
 }
 
-fn get_config() -> anyhow::Result<Option<DimOpts>> {
-    let Some(dirs) = ProjectDirs::from("com", "marcelohdez", "dim") else {
+fn get_config(dir: Option<&Path>) -> anyhow::Result<Option<DimOpts>> {
+    let project_dirs = ProjectDirs::from("com", "marcelohdez", "dim");
+
+    let Some(dir): Option<Cow<Path>> = dir
+        .map(Cow::Borrowed)
+        .or(project_dirs.map(|dirs| Cow::Owned(dirs.config_dir().join(CONFIG_FILENAME))))
+    else {
         bail!("Could not generate project directories on this OS?");
     };
-    let config_dir = dirs.config_dir().join(CONFIG_FILENAME);
 
-    if !config_dir.exists() {
+    if !dir.exists() {
         info!("No config found!");
         return Ok(None);
     }
 
-    debug!("Config file found at {config_dir:?}");
-
-    let file = File::open(config_dir)?;
+    debug!("Config file found at {dir:?}");
+    let file = File::open(dir).context("Failed to open config file")?;
     let config: DimOpts = toml::from_str(&read_to_string(file)?)?;
 
     debug!("Config: {config:?}");
