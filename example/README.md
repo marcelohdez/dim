@@ -1,14 +1,14 @@
 # Example configs
 
-## config.toml
+## [config.toml]
 
 Example dim config.
 
-## swayidle
+## [swayidle]
 
 Adapted from my own dotfiles, it does several things;
 
-At 45 seconds idle, check if `swaylock` (or your locker) is running, if so,
+At 45 seconds idle, check if [swaylock] (or your locker) is running, if so,
 suspend again (user has been idle for 45 seconds on lock screen):
 
 ```bash
@@ -30,3 +30,7 @@ media players and run screen locker:
 ```bash
 before-sleep 'playerctl pause -i kdeconnect; swaylock'
 ```
+
+[config.toml]: config.toml
+[swayidle]: swayidle
+[swaylock]: https://github.com/swaywm/swaylock
