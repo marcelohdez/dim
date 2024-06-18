@@ -1,0 +1,6 @@
+timeout 45 'pgrep swaylock && systemctl suspend'
+
+timeout 435 'dim && swaylock'
+timeout 480 'systemctl suspend'
+
+before-sleep 'playerctl pause -i kdeconnect; swaylock'

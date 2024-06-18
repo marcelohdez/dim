@@ -1,0 +1,3 @@
+# any line starting with a hashtag is a comment
+duration = 30
+alpha = 0.5
