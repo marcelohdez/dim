@@ -1,4 +1,4 @@
-name: Rust
+name: CI
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
       - name: Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev scdoc
       - name: Lint
         uses: wearerequired/lint-action@v2
         with:
@@ -28,3 +28,5 @@ jobs:
         run: cargo build --locked --verbose
       - name: Test locked
         run: cargo test --locked --verbose
+      - name: Test manpages
+        run: scdoc <man/*.scd >/dev/null
