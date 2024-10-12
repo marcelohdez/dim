@@ -34,7 +34,7 @@ detected after its timeout, swaylock will be run, locking the screen.
 
 \-a, --alpha <ALPHA>
 	Set the *alpha* value of the overlay, 0.0 being transparent and 1.0 being
-	solid black. Default is 0.5.
+	solid black. When solid, cursor will be hidden. Default is 0.5.
 
 \--gen-completions <PATH>
 	Generates completions for all supported shells at the given path.
