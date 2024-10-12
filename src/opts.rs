@@ -19,7 +19,7 @@ pub struct DimOpts {
     #[arg(
         short,
         long,
-        help = format!("0.0 is transparent, 1.0 is opaque, [default: {DEFAULT_ALPHA}]")
+        help = format!("0.0 is transparent, 1.0 is opaque. When opaque, cursor will be hidden. [default: {DEFAULT_ALPHA}]")
     )]
     pub alpha: Option<f32>,
 
