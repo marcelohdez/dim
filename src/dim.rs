@@ -426,12 +426,17 @@ impl PointerHandler for DimData {
         &mut self,
         _conn: &smithay_client_toolkit::reexports::client::Connection,
         _qh: &QueueHandle<Self>,
-        _pointer: &wl_pointer::WlPointer,
+        pointer: &wl_pointer::WlPointer,
         events: &[PointerEvent],
     ) {
         for e in events {
             match e.kind {
-                PointerEventKind::Enter { .. } | PointerEventKind::Leave { .. } => (),
+                PointerEventKind::Enter { serial } => {
+                    if self.alpha == 1.0 {
+                        pointer.set_cursor(serial, None, 0, 0);
+                    }
+                },
+                PointerEventKind::Leave { .. } => {}
                 _ => {
                     debug!("Mouse event");
                     self.exit = true;
