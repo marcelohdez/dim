@@ -14,13 +14,14 @@ use smithay_client_toolkit::{
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = DimOpts::parse();
+    args.validate()?;
 
     if let Some(path) = args.gen_completions {
         DimOpts::generate_completions(&path)?;
         return Ok(());
     }
 
-    let opts = match get_config(args.config.as_deref())? {
+    let opts = match get_config(args.config.as_deref()).context("Failed to read config!")? {
         Some(config) => config.merge_onto_self(args),
         None => args,
     };
@@ -67,6 +68,7 @@ fn get_config(dir: Option<&Path>) -> anyhow::Result<Option<DimOpts>> {
     let config: DimOpts = toml::from_str(&read_to_string(file)?)?;
 
     debug!("Config: {config:?}");
+    config.validate()?;
     Ok(Some(config))
 }
 

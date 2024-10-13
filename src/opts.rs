@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use anyhow::{anyhow, Result};
 use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate_to, Shell};
 use serde::Deserialize;
@@ -52,5 +53,15 @@ impl DimOpts {
 
             ..self
         }
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if let Some(alpha) = self.alpha {
+            if !(0.0..=1.0).contains(&alpha) {
+                return Err(anyhow!("Alpha can only be from 0.0 to 1.0 inclusive."));
+            }
+        }
+
+        Ok(())
     }
 }
