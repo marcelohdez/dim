@@ -36,6 +36,14 @@ detected after its timeout, swaylock will be run, locking the screen.
 	Set the *alpha* value of the overlay, 0.0 being transparent and 1.0 being
 	solid black. When solid, cursor will be hidden. Default is 0.5.
 
+\-p, --passthrough
+	Make dim ignore input, passing it to the surfaces behind it, making dim act as
+	a way to lower your brightness artificially. You probably want to set the
+	duration option above to 0 for this to last indefinitely.
+
+	When scripting this, you could summon dim with passthrough enabled and then
+	kill it with `pkill dim`
+
 \--gen-completions <PATH>
 	Generates completions for all supported shells at the given path.
 
