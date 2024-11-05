@@ -24,6 +24,13 @@ pub struct DimOpts {
     )]
     pub alpha: Option<f32>,
 
+    #[arg(
+        short,
+        long,
+        help = "Make dim ignore input, passing it to lower surfaces. (You probably want to use `-d 0` with this)"
+    )]
+    pub passthrough: bool,
+
     #[serde(skip)]
     #[arg(long, value_name = "PATH", help = "Generate completions at given path")]
     pub gen_completions: Option<PathBuf>,
@@ -50,6 +57,7 @@ impl DimOpts {
         Self {
             duration: other.duration.or(self.duration),
             alpha: other.alpha.or(self.alpha),
+            passthrough: self.passthrough || other.passthrough,
 
             ..self
         }

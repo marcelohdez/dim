@@ -38,7 +38,7 @@ fn main() -> anyhow::Result<()> {
         });
     }
 
-    let (mut data, mut event_queue) = create_wl_app(alpha)?;
+    let (mut data, mut event_queue) = create_wl_app(alpha, opts.passthrough)?;
     while !data.should_exit() {
         event_queue
             .blocking_dispatch(&mut data)
@@ -72,7 +72,7 @@ fn get_config(dir: Option<&Path>) -> anyhow::Result<Option<DimOpts>> {
     Ok(Some(config))
 }
 
-fn create_wl_app(alpha: f32) -> anyhow::Result<(DimData, EventQueue<DimData>)> {
+fn create_wl_app(alpha: f32, passthrough: bool) -> anyhow::Result<(DimData, EventQueue<DimData>)> {
     let conn = Connection::connect_to_env().context("Failed to connect to environment")?;
 
     let (globals, event_queue) =
@@ -83,7 +83,7 @@ fn create_wl_app(alpha: f32) -> anyhow::Result<(DimData, EventQueue<DimData>)> {
     let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
 
     Ok((
-        DimData::new(compositor, &globals, &qh, layer_shell, alpha),
+        DimData::new(compositor, &globals, &qh, layer_shell, alpha, passthrough),
         event_queue,
     ))
 }

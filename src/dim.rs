@@ -1,6 +1,6 @@
 use log::{debug, error};
 use smithay_client_toolkit::{
-    compositor::{CompositorHandler, CompositorState},
+    compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
     delegate_registry, delegate_seat, delegate_simple, delegate_touch,
     output::{OutputHandler, OutputState},
@@ -51,6 +51,7 @@ pub struct DimData {
     viewporter: SimpleGlobal<WpViewporter, 1>,
 
     alpha: f32,
+    passthrough: bool,
     views: Vec<DimView>,
 
     keyboard: Option<wl_keyboard::WlKeyboard>,
@@ -76,6 +77,7 @@ impl DimData {
         qh: &QueueHandle<Self>,
         layer_shell: LayerShell,
         alpha: f32,
+        passthrough: bool,
     ) -> Self {
         Self {
             compositor,
@@ -89,6 +91,7 @@ impl DimData {
                 .expect("wp_viewporter not available"),
 
             alpha,
+            passthrough,
             views: Vec::new(),
 
             exit: false,
@@ -121,8 +124,15 @@ impl DimData {
             (INIT_SIZE, INIT_SIZE)
         };
 
+        if self.passthrough {
+            let input_region = Region::new(&self.compositor).expect("Failed to get a wl_region");
+            layer.set_keyboard_interactivity(KeyboardInteractivity::None);
+            layer.set_input_region(Some(input_region.wl_region()));
+        } else {
+            layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
+        }
+
         layer.set_exclusive_zone(-1);
-        layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
         layer.set_size(width, height);
         layer.commit();
 
@@ -435,7 +445,7 @@ impl PointerHandler for DimData {
                     if self.alpha == 1.0 {
                         pointer.set_cursor(serial, None, 0, 0);
                     }
-                },
+                }
                 PointerEventKind::Leave { .. } => {}
                 _ => {
                     debug!("Mouse event");
