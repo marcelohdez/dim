@@ -1,3 +1,5 @@
 # any line starting with a hashtag is a comment
+# here are some default values:
 duration = 30
 alpha = 0.5
+passthrough = false
