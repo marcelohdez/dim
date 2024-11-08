@@ -29,6 +29,7 @@ pub struct DimOpts {
         long,
         help = "Make dim ignore input, passing it to lower surfaces. (You probably want to use `-d 0` with this)"
     )]
+    #[serde(default)]
     pub passthrough: bool,
 
     #[serde(skip)]
