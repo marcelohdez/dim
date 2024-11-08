@@ -1,9 +1,16 @@
-use std::{borrow::Cow, fs::File, io::read_to_string, path::Path, process, thread, time::Duration};
+use std::{
+    borrow::Cow,
+    env,
+    fs::File,
+    io::read_to_string,
+    path::{Path, PathBuf},
+    process, thread,
+    time::Duration,
+};
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use clap::Parser;
 use dim_screen::{dim::DimData, opts::DimOpts, CONFIG_FILENAME, DEFAULT_ALPHA, DEFAULT_DURATION};
-use directories::ProjectDirs;
 use log::{debug, info};
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -49,22 +56,32 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn get_config(dir: Option<&Path>) -> anyhow::Result<Option<DimOpts>> {
-    let project_dirs = ProjectDirs::from("com", "marcelohdez", "dim");
+    let config = match dir {
+        Some(user_config) => Cow::Borrowed(user_config),
+        None => {
+            // follow XDG base directory spec, checking $XDG_CONFIG_HOME first then defaulting to $HOME/.config
+            let config_home = env::var("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .or(env::var("HOME")
+                    .map(PathBuf::from)
+                    .map(|p| p.join(".config")));
 
-    let Some(dir): Option<Cow<Path>> = dir
-        .map(Cow::Borrowed)
-        .or(project_dirs.map(|dirs| Cow::Owned(dirs.config_dir().join(CONFIG_FILENAME))))
-    else {
-        bail!("Could not generate project directories on this OS?");
+            if let Ok(path) = config_home {
+                Cow::Owned(path.join("dim").join(CONFIG_FILENAME))
+            } else {
+                info!("No config path, neither XDG_CONFIG_HOME nor HOME are set.");
+                return Ok(None);
+            }
+        }
     };
 
-    if !dir.exists() {
+    if !config.exists() {
         info!("No config found!");
         return Ok(None);
     }
 
-    debug!("Config file found at {dir:?}");
-    let file = File::open(dir).context("Failed to open config file")?;
+    debug!("Config file found at {config:?}");
+    let file = File::open(config).context("Failed to open config file")?;
     let config: DimOpts = toml::from_str(&read_to_string(file)?)?;
 
     debug!("Config: {config:?}");
