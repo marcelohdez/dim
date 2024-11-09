@@ -64,10 +64,11 @@ looked for at `$XDG_CONFIG_HOME/dim/config.toml`, or, if `$XDG_CONFIG_HOME` is
 not set, it will instead default to searching at `~/.config/dim/config.toml`.
 
 The options set here will be overriden by any arguments passed in. Valid
-options are alpha and duration as seen above, example config:
+options are alpha, duration and passthrough as seen above, example config:
 
 ```
 # i am a comment!
 duration = 30
 alpha = 0.5
+passthrough = false
 ```
