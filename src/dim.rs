@@ -250,6 +250,24 @@ impl CompositorHandler for DimData {
         _time: u32,
     ) {
     }
+
+    fn surface_enter(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _output: &smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
+    ) {
+    }
+
+    fn surface_leave(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        _output: &smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
+    ) {
+    }
 }
 
 impl OutputHandler for DimData {
@@ -426,6 +444,7 @@ impl KeyboardHandler for DimData {
         _keyboard: &wl_keyboard::WlKeyboard,
         _serial: u32,
         _modifiers: smithay_client_toolkit::seat::keyboard::Modifiers,
+        _layout: u32,
     ) {
         debug!("Modifiers updated");
     }
