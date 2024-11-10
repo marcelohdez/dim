@@ -46,11 +46,11 @@ sudo dnf install dim-screen
 
 ### Arch (AUR)
 
-For Arch, dim is available in the [AUR]. You may use your
-preferred [AUR helper] like so:
+For Arch, dim is available in the [AUR] (Thanks to [ge-garcia] for
+maintaining!). You may use your preferred [AUR helper] like so:
 
 ```bash
-paru -S dim-screen
+paru -Syu dim-screen
 ```
 
 ### Others
@@ -96,6 +96,7 @@ And the resulting binary should be in `./target/release/dim`.
 more information, please refer to the [LICENSE] file in the repository root.
 
 [AUR]: https://aur.archlinux.org/packages/dim-screen
+[ge-garcia]: https://github.com/ge-garcia/
 [AUR helper]: https://wiki.archlinux.org/title/AUR_helpers
 [COPR]: https://copr.fedorainfracloud.org/coprs/marcelohdez/dim
 [installing]: #installing
