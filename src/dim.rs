@@ -69,6 +69,40 @@ enum BufferManager {
     Shm(Shm, SlotPool),
 }
 
+impl BufferManager {
+    fn get_buffer(&mut self, qh: &QueueHandle<DimData>, alpha: f32) -> BufferType {
+        match self {
+            BufferManager::SinglePixel(simple_global) => {
+                // pre-multiply alpha
+                let alpha = (u32::MAX as f32 * alpha) as u32;
+
+                BufferType::Wl(
+                    simple_global
+                        .get()
+                        .expect("failed to get buffer")
+                        .create_u32_rgba_buffer(0, 0, 0, alpha, qh, ()),
+                )
+            }
+
+            // create a singe pixel buffer ourselves (to be resized by viewporter as well)
+            BufferManager::Shm(_, pool) => {
+                let (buffer, canvas) = pool
+                    .create_buffer(1, 1, 4, wl_shm::Format::Argb8888)
+                    .expect("Failed to get buffer from slot pool!");
+
+                // ARGB is actually backwards being little-endian, so we set BGR to 0 for black so
+                (0..3).for_each(|i| {
+                    canvas[i] = 0;
+                });
+                // then, we set pre-multiplied alpha
+                canvas[3] = (u8::MAX as f32 * alpha) as u8;
+
+                BufferType::Shared(buffer)
+            }
+        }
+    }
+}
+
 struct DimView {
     first_configure: bool,
     width: u32,
@@ -129,39 +163,7 @@ impl DimData {
         self.exit
     }
 
-    fn get_buffer(&mut self, qh: &QueueHandle<Self>) -> BufferType {
-        match &mut self.buffer_mgr {
-            BufferManager::SinglePixel(simple_global) => {
-                // pre-multiply alpha
-                let alpha = (u32::MAX as f32 * self.alpha) as u32;
-
-                BufferType::Wl(
-                    simple_global
-                        .get()
-                        .expect("failed to get buffer")
-                        .create_u32_rgba_buffer(0, 0, 0, alpha, qh, ()),
-                )
-            }
-
-            // create a singe pixel buffer ourselves (to be resized by viewporter as well)
-            BufferManager::Shm(_, pool) => {
-                let (buffer, canvas) = pool
-                    .create_buffer(1, 1, 4, wl_shm::Format::Argb8888)
-                    .expect("Failed to get buffer from slot pool!");
-
-                // set RGB to 0
-                for i in 0..3 {
-                    canvas[i] = 0;
-                }
-                // set pre-multiplied alpha (little endian, so it comes last)
-                canvas[3] = (u8::MAX as f32 * self.alpha) as u8;
-
-                BufferType::Shared(buffer)
-            }
-        }
-    }
-
-    fn create_view(&mut self, qh: &QueueHandle<Self>, output: WlOutput) -> DimView {
+    fn create_view(&self, qh: &QueueHandle<Self>, buffer: BufferType, output: WlOutput) -> DimView {
         let layer = self.layer_shell.create_layer_surface(
             qh,
             self.compositor.create_surface(qh),
@@ -197,8 +199,6 @@ impl DimData {
             .get()
             .expect("wp_viewporter failed")
             .get_viewport(layer.wl_surface(), qh, ());
-
-        let buffer = self.get_buffer(qh);
 
         DimView::new(qh, buffer, viewport, layer, output)
     }
@@ -336,7 +336,8 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        let view = self.create_view(qh, output);
+        let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
+        let view = self.create_view(qh, buffer, output);
         self.views.push(view);
     }
 
@@ -346,7 +347,8 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        let new_view = self.create_view(qh, output);
+        let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
+        let new_view = self.create_view(qh, buffer, output);
 
         if let Some(view) = self.views.iter_mut().find(|v| v.output == new_view.output) {
             *view = new_view;
@@ -645,6 +647,7 @@ impl Dispatch<WpSinglePixelBufferManagerV1, ()> for DimData {
         unreachable!("wp_single_pixel_buffer_manager_v1::Event is empty in version 1")
     }
 }
+
 impl Dispatch<WlBuffer, ()> for DimData {
     fn event(
         _: &mut Self,
