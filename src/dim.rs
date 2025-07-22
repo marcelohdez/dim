@@ -249,8 +249,8 @@ impl LayerShellHandler for DimData {
         _qh: &QueueHandle<Self>,
         _layer: &LayerSurface,
     ) {
-        debug!("Closed");
-        self.exit = true;
+        // should not be possible other than by the compositor (e.g. when disconnecting outputs),
+        // which is okay as any input will make us exit
     }
 
     fn configure(
