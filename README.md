@@ -5,8 +5,8 @@ Native Wayland screen dimming tool
 ## Usage
 
 > [!NOTE]
-> A Wayland compositor implementing the [wlr-layer-shell-unstable-v1] protocol
-> is required, e.g. Niri, Sway, Hyprland, River, Labwc.
+> A Wayland compositor implementing the [wlr-layer-shell-unstable-v1](https://wayland.app/protocols/wlr-layer-shell-unstable-v1#compositor-support)
+> protocol is required, e.g. Niri, Sway, Hyprland, River, Labwc.
 
 After [installing], you may run `dim` before you would run your locker, when
 you want the screen to dim for a period, e.g. in your [swayidle] config/command:
