@@ -1,8 +1,8 @@
-use log::{debug, error};
+use log::{debug, error, warn};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
-    delegate_registry, delegate_seat, delegate_simple, delegate_touch,
+    delegate_registry, delegate_seat, delegate_shm, delegate_simple, delegate_touch,
     output::{OutputHandler, OutputState},
     reexports::{
         client::{
@@ -11,7 +11,7 @@ use smithay_client_toolkit::{
                 wl_buffer::{self, WlBuffer},
                 wl_keyboard,
                 wl_output::WlOutput,
-                wl_pointer, wl_touch,
+                wl_pointer, wl_shm, wl_touch,
             },
             Connection, Dispatch, QueueHandle,
         },
@@ -37,6 +37,10 @@ use smithay_client_toolkit::{
         wlr_layer::{KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface},
         WaylandSurface,
     },
+    shm::{
+        slot::{Buffer, SlotPool},
+        Shm, ShmHandler,
+    },
 };
 
 use crate::INIT_SIZE;
@@ -47,7 +51,7 @@ pub struct DimData {
     seat_state: SeatState,
     output_state: OutputState,
     layer_shell: LayerShell,
-    pixel_buffer_mgr: SimpleGlobal<WpSinglePixelBufferManagerV1, 1>,
+    buffer_mgr: BufferManager,
     viewporter: SimpleGlobal<WpViewporter, 1>,
 
     alpha: f32,
@@ -60,14 +64,58 @@ pub struct DimData {
     exit: bool,
 }
 
+enum BufferManager {
+    SinglePixel(SimpleGlobal<WpSinglePixelBufferManagerV1, 1>),
+    Shm(Shm, SlotPool),
+}
+
+impl BufferManager {
+    fn get_buffer(&mut self, qh: &QueueHandle<DimData>, alpha: f32) -> BufferType {
+        match self {
+            BufferManager::SinglePixel(simple_global) => {
+                // pre-multiply alpha
+                let alpha = (u32::MAX as f32 * alpha) as u32;
+
+                BufferType::Wl(
+                    simple_global
+                        .get()
+                        .expect("failed to get buffer")
+                        .create_u32_rgba_buffer(0, 0, 0, alpha, qh, ()),
+                )
+            }
+
+            // create a singe pixel buffer ourselves (to be resized by viewporter as well)
+            BufferManager::Shm(_, pool) => {
+                let (buffer, canvas) = pool
+                    .create_buffer(1, 1, 4, wl_shm::Format::Argb8888)
+                    .expect("Failed to get buffer from slot pool!");
+
+                // ARGB is actually backwards being little-endian, so we set BGR to 0 for black so
+                (0..3).for_each(|i| {
+                    canvas[i] = 0;
+                });
+                // then, we set pre-multiplied alpha
+                canvas[3] = (u8::MAX as f32 * alpha) as u8;
+
+                BufferType::Shared(buffer)
+            }
+        }
+    }
+}
+
 struct DimView {
     first_configure: bool,
     width: u32,
     height: u32,
-    buffer: WlBuffer,
+    buffer: BufferType,
     viewport: WpViewport,
     layer: LayerSurface,
     output: WlOutput,
+}
+
+enum BufferType {
+    Wl(WlBuffer),
+    Shared(Buffer),
 }
 
 impl DimData {
@@ -79,14 +127,24 @@ impl DimData {
         alpha: f32,
         passthrough: bool,
     ) -> Self {
+        let buffer_mgr = match SimpleGlobal::<WpSinglePixelBufferManagerV1, 1>::bind(globals, qh) {
+            Ok(sg) => BufferManager::SinglePixel(sg),
+            Err(_) => {
+                warn!("Single pixel buffer not available! Using fallback.");
+
+                let shm = Shm::bind(globals, qh).expect("Could not create shm.");
+                let pool = SlotPool::new(1, &shm).expect("Failed to create pool!");
+                BufferManager::Shm(shm, pool)
+            }
+        };
+
         Self {
             compositor,
             registry_state: RegistryState::new(globals),
             seat_state: SeatState::new(globals, qh),
             output_state: OutputState::new(globals, qh),
             layer_shell,
-            pixel_buffer_mgr: SimpleGlobal::<WpSinglePixelBufferManagerV1, 1>::bind(globals, qh)
-                .expect("wp_single_pixel_buffer_manager_v1 not available!"),
+            buffer_mgr,
             viewporter: SimpleGlobal::<wp_viewporter::WpViewporter, 1>::bind(globals, qh)
                 .expect("wp_viewporter not available"),
 
@@ -105,7 +163,7 @@ impl DimData {
         self.exit
     }
 
-    fn create_view(&self, qh: &QueueHandle<Self>, output: WlOutput) -> DimView {
+    fn create_view(&self, qh: &QueueHandle<Self>, buffer: BufferType, output: WlOutput) -> DimView {
         let layer = self.layer_shell.create_layer_surface(
             qh,
             self.compositor.create_surface(qh),
@@ -142,14 +200,6 @@ impl DimData {
             .expect("wp_viewporter failed")
             .get_viewport(layer.wl_surface(), qh, ());
 
-        // pre-multiply alpha
-        let alpha = (u32::MAX as f32 * self.alpha) as u32;
-        let buffer = self
-            .pixel_buffer_mgr
-            .get()
-            .expect("failed to get buffer")
-            .create_u32_rgba_buffer(0, 0, 0, alpha, qh, ());
-
         DimView::new(qh, buffer, viewport, layer, output)
     }
 }
@@ -157,7 +207,7 @@ impl DimData {
 impl DimView {
     fn new(
         _qh: &QueueHandle<DimData>,
-        buffer: WlBuffer,
+        buffer: BufferType,
         viewport: WpViewport,
         layer: LayerSurface,
         output: WlOutput,
@@ -180,7 +230,12 @@ impl DimView {
             return;
         }
 
-        self.layer.wl_surface().attach(Some(&self.buffer), 0, 0);
+        let wl_buffer = match &self.buffer {
+            BufferType::Wl(wl_buffer) => wl_buffer,
+            BufferType::Shared(buffer) => buffer.wl_buffer(),
+        };
+
+        self.layer.wl_surface().attach(Some(wl_buffer), 0, 0);
         self.layer.commit();
 
         debug!("Drawn");
@@ -281,7 +336,9 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        self.views.push(self.create_view(qh, output));
+        let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
+        let view = self.create_view(qh, buffer, output);
+        self.views.push(view);
     }
 
     fn update_output(
@@ -290,7 +347,8 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        let new_view = self.create_view(qh, output);
+        let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
+        let new_view = self.create_view(qh, buffer, output);
 
         if let Some(view) = self.views.iter_mut().find(|v| v.output == new_view.output) {
             *view = new_view;
@@ -536,6 +594,15 @@ impl TouchHandler for DimData {
     fn cancel(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _touch: &wl_touch::WlTouch) {}
 }
 
+impl ShmHandler for DimData {
+    fn shm_state(&mut self) -> &mut Shm {
+        match &mut self.buffer_mgr {
+            BufferManager::Shm(shm, _) => shm,
+            _ => unreachable!("Attempted to call shm_state() when not using shm."),
+        }
+    }
+}
+
 delegate_compositor!(DimData);
 delegate_touch!(DimData);
 delegate_layer!(DimData);
@@ -545,6 +612,7 @@ delegate_keyboard!(DimData);
 delegate_output!(DimData);
 delegate_seat!(DimData);
 delegate_simple!(DimData, WpViewporter, 1);
+delegate_shm!(DimData);
 
 impl ProvidesRegistryState for DimData {
     fn registry(&mut self) -> &mut RegistryState {
@@ -579,6 +647,7 @@ impl Dispatch<WpSinglePixelBufferManagerV1, ()> for DimData {
         unreachable!("wp_single_pixel_buffer_manager_v1::Event is empty in version 1")
     }
 }
+
 impl Dispatch<WlBuffer, ()> for DimData {
     fn event(
         _: &mut Self,
@@ -598,6 +667,8 @@ impl Dispatch<WlBuffer, ()> for DimData {
 impl Drop for DimView {
     fn drop(&mut self) {
         self.viewport.destroy();
-        self.buffer.destroy();
+        if let BufferType::Wl(buffer) = &mut self.buffer {
+            buffer.destroy();
+        }
     }
 }

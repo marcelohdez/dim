@@ -5,8 +5,8 @@ Native Wayland screen dimming tool
 ## Usage
 
 > [!NOTE]
-> A Wayland compositor supporting the [single pixel buffer protocol] is
-> required e.g. Sway 1.8+, river, Hyprland.
+> A Wayland compositor implementing the [wlr-layer-shell-unstable-v1] protocol
+> is required, e.g. Niri, Sway, Hyprland, River, Labwc.
 
 After [installing], you may run `dim` before you would run your locker, when
 you want the screen to dim for a period, e.g. in your [swayidle] config/command:
@@ -104,5 +104,4 @@ more information, please refer to the [LICENSE] file in the repository root.
 [swaylock]: https://github.com/swaywm/swaylock
 [submit an issue]: https://github.com/marcelohdez/dim/issues
 [Rust]: https://www.rust-lang.org/
-[single pixel buffer protocol]: https://wayland.app/protocols/single-pixel-buffer-v1
 [LICENSE]: LICENSE

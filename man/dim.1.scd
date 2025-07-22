@@ -10,8 +10,7 @@ dim [OPTIONS]
 
 # DESCRIPTION
 
-dim requires a Wayland compositor with suport for the single pixel buffer
-protocol, e.g. Sway 1.8+, river, Hyprland.
+dim requires a Wayland compositor implementing the wlr-layer-shell protocol.
 
 Upon running, dim will create a black overlay with the given alpha (see
 OPTIONS) and wait for the given duration (see OPTIONS). If any mouse, touch or
