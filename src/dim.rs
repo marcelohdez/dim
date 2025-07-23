@@ -37,13 +37,10 @@ use smithay_client_toolkit::{
         wlr_layer::{KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface},
         WaylandSurface,
     },
-    shm::{
-        slot::{Buffer, SlotPool},
-        Shm, ShmHandler,
-    },
+    shm::{slot::SlotPool, Shm, ShmHandler},
 };
 
-use crate::INIT_SIZE;
+use crate::{consts::INIT_SIZE, surface::BufferType, DimSurface};
 
 pub struct DimData {
     compositor: CompositorState,
@@ -56,7 +53,7 @@ pub struct DimData {
 
     alpha: f32,
     passthrough: bool,
-    views: Vec<DimView>,
+    surfaces: Vec<DimSurface>,
 
     keyboard: Option<wl_keyboard::WlKeyboard>,
     pointer: Option<wl_pointer::WlPointer>,
@@ -64,12 +61,15 @@ pub struct DimData {
     exit: bool,
 }
 
+/// Abstracts away which is the best buffer manager available
 enum BufferManager {
     SinglePixel(SimpleGlobal<WpSinglePixelBufferManagerV1, 1>),
+    /// Used as fallback, when single pixel buffer is not available
     Shm(Shm, SlotPool),
 }
 
 impl BufferManager {
+    /// Generate a new buffer from the owned buffer manager type
     fn get_buffer(&mut self, qh: &QueueHandle<DimData>, alpha: f32) -> BufferType {
         match self {
             BufferManager::SinglePixel(simple_global) => {
@@ -103,22 +103,8 @@ impl BufferManager {
     }
 }
 
-struct DimView {
-    first_configure: bool,
-    width: u32,
-    height: u32,
-    buffer: BufferType,
-    viewport: WpViewport,
-    layer: LayerSurface,
-    output: WlOutput,
-}
-
-enum BufferType {
-    Wl(WlBuffer),
-    Shared(Buffer),
-}
-
 impl DimData {
+    /// Generate a new instance of our app
     pub fn new(
         compositor: CompositorState,
         globals: &GlobalList,
@@ -150,7 +136,7 @@ impl DimData {
 
             alpha,
             passthrough,
-            views: Vec::new(),
+            surfaces: Vec::new(),
 
             exit: false,
             keyboard: None,
@@ -163,7 +149,13 @@ impl DimData {
         self.exit
     }
 
-    fn create_view(&self, qh: &QueueHandle<Self>, buffer: BufferType, output: WlOutput) -> DimView {
+    /// Create a new dimmed surface to show on the given output
+    fn new_surface(
+        &self,
+        qh: &QueueHandle<Self>,
+        buffer: BufferType,
+        output: WlOutput,
+    ) -> DimSurface {
         let layer = self.layer_shell.create_layer_surface(
             qh,
             self.compositor.create_surface(qh),
@@ -200,45 +192,7 @@ impl DimData {
             .expect("wp_viewporter failed")
             .get_viewport(layer.wl_surface(), qh, ());
 
-        DimView::new(qh, buffer, viewport, layer, output)
-    }
-}
-
-impl DimView {
-    fn new(
-        _qh: &QueueHandle<DimData>,
-        buffer: BufferType,
-        viewport: WpViewport,
-        layer: LayerSurface,
-        output: WlOutput,
-    ) -> Self {
-        Self {
-            first_configure: true,
-            width: INIT_SIZE,
-            height: INIT_SIZE,
-            buffer,
-            viewport,
-            layer,
-            output,
-        }
-    }
-
-    fn draw(&mut self, _qh: &QueueHandle<DimData>) {
-        debug!("Requesting draw");
-        if !self.first_configure {
-            // we only need to draw once as it is a static color
-            return;
-        }
-
-        let wl_buffer = match &self.buffer {
-            BufferType::Wl(wl_buffer) => wl_buffer,
-            BufferType::Shared(buffer) => buffer.wl_buffer(),
-        };
-
-        self.layer.wl_surface().attach(Some(wl_buffer), 0, 0);
-        self.layer.commit();
-
-        debug!("Drawn");
+        DimSurface::new(qh, buffer, viewport, layer, output)
     }
 }
 
@@ -261,19 +215,18 @@ impl LayerShellHandler for DimData {
         configure: smithay_client_toolkit::shell::wlr_layer::LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        let Some(view) = self.views.iter_mut().find(|view| &view.layer == layer) else {
+        let Some(view) = self.surfaces.iter_mut().find(|view| view.layer() == layer) else {
             error!("Configuring layer not in self.views?");
             return;
         };
 
-        (view.width, view.height) = configure.new_size;
+        let (width, height) = configure.new_size;
+        view.set_size(width, height);
+        view.viewport().set_destination(width as _, height as _);
 
-        view.viewport
-            .set_destination(view.width as _, view.height as _);
-
-        if view.first_configure {
+        if view.first_configure() {
             view.draw(qh);
-            view.first_configure = false;
+            view.set_first_configure(false);
         }
     }
 }
@@ -304,6 +257,7 @@ impl CompositorHandler for DimData {
         _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _time: u32,
     ) {
+        debug!("Frame");
     }
 
     fn surface_enter(
@@ -337,8 +291,8 @@ impl OutputHandler for DimData {
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
         let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
-        let view = self.create_view(qh, buffer, output);
-        self.views.push(view);
+        let view = self.new_surface(qh, buffer, output);
+        self.surfaces.push(view);
     }
 
     fn update_output(
@@ -348,9 +302,13 @@ impl OutputHandler for DimData {
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
         let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
-        let new_view = self.create_view(qh, buffer, output);
+        let new_view = self.new_surface(qh, buffer, output);
 
-        if let Some(view) = self.views.iter_mut().find(|v| v.output == new_view.output) {
+        if let Some(view) = self
+            .surfaces
+            .iter_mut()
+            .find(|v| v.output() == new_view.output())
+        {
             *view = new_view;
         } else {
             error!("Updating output not in views list??");
@@ -363,7 +321,7 @@ impl OutputHandler for DimData {
         _qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        self.views.retain(|v| v.output != output);
+        self.surfaces.retain(|v| v.output() != &output);
     }
 }
 
@@ -507,7 +465,6 @@ impl KeyboardHandler for DimData {
         debug!("Modifiers updated");
     }
 }
-
 impl PointerHandler for DimData {
     fn pointer_frame(
         &mut self,
@@ -532,7 +489,6 @@ impl PointerHandler for DimData {
         }
     }
 }
-
 impl TouchHandler for DimData {
     fn down(
         &mut self,
@@ -593,7 +549,6 @@ impl TouchHandler for DimData {
 
     fn cancel(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _touch: &wl_touch::WlTouch) {}
 }
-
 impl ShmHandler for DimData {
     fn shm_state(&mut self) -> &mut Shm {
         match &mut self.buffer_mgr {
@@ -660,15 +615,6 @@ impl Dispatch<WlBuffer, ()> for DimData {
         match event {
             wl_buffer::Event::Release => debug!("WlBuffer released"),
             _ => unreachable!("WlBuffer only has Release event"),
-        }
-    }
-}
-
-impl Drop for DimView {
-    fn drop(&mut self) {
-        self.viewport.destroy();
-        if let BufferType::Wl(buffer) = &mut self.buffer {
-            buffer.destroy();
         }
     }
 }

@@ -1,10 +1,17 @@
-pub mod dim;
-pub mod opts;
+mod dim;
+mod opts;
+mod surface;
 
-pub const DEFAULT_DURATION: u64 = 30;
-pub const DEFAULT_ALPHA: f32 = 0.5;
+pub use dim::DimData;
+pub use opts::DimOpts;
+pub use surface::DimSurface;
 
-pub const CONFIG_FILENAME: &str = "config.toml";
+pub mod consts {
+    pub const DEFAULT_DURATION: u64 = 30;
+    pub const DEFAULT_ALPHA: f32 = 0.5;
 
-/// Default window size in width and height, in logical pixels
-pub const INIT_SIZE: u32 = 100;
+    pub const CONFIG_FILENAME: &str = "config.toml";
+
+    /// Default window size in width and height, in logical pixels
+    pub const INIT_SIZE: u32 = 100;
+}

@@ -5,7 +5,7 @@ use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate_to, Shell};
 use serde::Deserialize;
 
-use crate::{DEFAULT_ALPHA, DEFAULT_DURATION};
+use crate::{consts::DEFAULT_ALPHA, consts::DEFAULT_DURATION};
 
 #[derive(Debug, Deserialize, Parser)]
 #[command(author, version, about)]
@@ -64,6 +64,8 @@ impl DimOpts {
         }
     }
 
+    /// Validate that the received values are within our limits, should be called before using this
+    /// object.
     pub fn validate(&self) -> Result<()> {
         if let Some(alpha) = self.alpha {
             if !(0.0..=1.0).contains(&alpha) {
@@ -72,5 +74,15 @@ impl DimOpts {
         }
 
         Ok(())
+    }
+
+    /// Get user desired alpha or the default value.
+    pub fn alpha(&self) -> f32 {
+        self.alpha.unwrap_or(DEFAULT_ALPHA)
+    }
+
+    /// Get user desired duration or the default value.
+    pub fn duration(&self) -> u64 {
+        self.duration.unwrap_or(DEFAULT_DURATION)
     }
 }

@@ -10,7 +10,7 @@ use std::{
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use dim_screen::{dim::DimData, opts::DimOpts, CONFIG_FILENAME, DEFAULT_ALPHA, DEFAULT_DURATION};
+use dim_screen::{consts::CONFIG_FILENAME, DimData, DimOpts};
 use log::{debug, info};
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -24,8 +24,7 @@ fn main() -> anyhow::Result<()> {
     args.validate()?;
 
     if let Some(path) = args.gen_completions {
-        DimOpts::generate_completions(&path)?;
-        return Ok(());
+        return DimOpts::generate_completions(&path);
     }
 
     let opts = match get_config(args.config.as_deref()).context("Failed to read config!")? {
@@ -34,8 +33,8 @@ fn main() -> anyhow::Result<()> {
     };
 
     debug!("Using options: {opts:?}");
-    let alpha = opts.alpha.unwrap_or(DEFAULT_ALPHA);
-    let duration = opts.duration.unwrap_or(DEFAULT_DURATION);
+    let alpha = opts.alpha();
+    let duration = opts.duration();
 
     // A duration of 0 is considered as infinite, not starting the timer:
     if duration > 0 {
