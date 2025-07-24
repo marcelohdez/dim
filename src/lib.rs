@@ -2,6 +2,8 @@ mod dim;
 mod opts;
 mod surface;
 
+pub mod buffer;
+
 pub use dim::DimData;
 pub use opts::DimOpts;
 pub use surface::DimSurface;

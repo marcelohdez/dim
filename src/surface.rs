@@ -1,17 +1,13 @@
 use log::debug;
 use smithay_client_toolkit::{
     reexports::{
-        client::{
-            protocol::{wl_buffer::WlBuffer, wl_output::WlOutput},
-            QueueHandle,
-        },
+        client::{protocol::wl_output::WlOutput, QueueHandle},
         protocols::wp::viewporter::client::wp_viewport::WpViewport,
     },
     shell::{wlr_layer::LayerSurface, WaylandSurface},
-    shm::slot,
 };
 
-use crate::{consts::INIT_SIZE, DimData};
+use crate::{buffer::BufferType, consts::INIT_SIZE, DimData};
 
 pub struct DimSurface {
     first_configure: bool,
@@ -21,11 +17,6 @@ pub struct DimSurface {
     viewport: WpViewport,
     layer: LayerSurface,
     output: WlOutput,
-}
-
-pub enum BufferType {
-    Wl(WlBuffer),
-    Shared(slot::Buffer),
 }
 
 impl DimSurface {
@@ -94,7 +85,7 @@ impl DimSurface {
         self.height = height;
     }
 
-    pub fn viewport(&mut self) -> &mut WpViewport {
+    pub fn viewport_mut(&mut self) -> &mut WpViewport {
         &mut self.viewport
     }
 }

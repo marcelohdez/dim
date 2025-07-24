@@ -11,7 +11,7 @@ use smithay_client_toolkit::{
                 wl_buffer::{self, WlBuffer},
                 wl_keyboard,
                 wl_output::WlOutput,
-                wl_pointer, wl_shm, wl_touch,
+                wl_pointer, wl_touch,
             },
             Connection, Dispatch, QueueHandle,
         },
@@ -40,7 +40,11 @@ use smithay_client_toolkit::{
     shm::{slot::SlotPool, Shm, ShmHandler},
 };
 
-use crate::{consts::INIT_SIZE, surface::BufferType, DimSurface};
+use crate::{
+    buffer::{BufferManager, BufferType},
+    consts::INIT_SIZE,
+    DimSurface,
+};
 
 pub struct DimData {
     compositor: CompositorState,
@@ -59,48 +63,6 @@ pub struct DimData {
     pointer: Option<wl_pointer::WlPointer>,
     touch: Option<wl_touch::WlTouch>,
     exit: bool,
-}
-
-/// Abstracts away which is the best buffer manager available
-enum BufferManager {
-    SinglePixel(SimpleGlobal<WpSinglePixelBufferManagerV1, 1>),
-    /// Used as fallback, when single pixel buffer is not available
-    Shm(Shm, SlotPool),
-}
-
-impl BufferManager {
-    /// Generate a new buffer from the owned buffer manager type
-    fn get_buffer(&mut self, qh: &QueueHandle<DimData>, alpha: f32) -> BufferType {
-        match self {
-            BufferManager::SinglePixel(simple_global) => {
-                // pre-multiply alpha
-                let alpha = (u32::MAX as f32 * alpha) as u32;
-
-                BufferType::Wl(
-                    simple_global
-                        .get()
-                        .expect("failed to get buffer")
-                        .create_u32_rgba_buffer(0, 0, 0, alpha, qh, ()),
-                )
-            }
-
-            // create a singe pixel buffer ourselves (to be resized by viewporter as well)
-            BufferManager::Shm(_, pool) => {
-                let (buffer, canvas) = pool
-                    .create_buffer(1, 1, 4, wl_shm::Format::Argb8888)
-                    .expect("Failed to get buffer from slot pool!");
-
-                // ARGB is actually backwards being little-endian, so we set BGR to 0 for black so
-                (0..3).for_each(|i| {
-                    canvas[i] = 0;
-                });
-                // then, we set pre-multiplied alpha
-                canvas[3] = (u8::MAX as f32 * alpha) as u8;
-
-                BufferType::Shared(buffer)
-            }
-        }
-    }
 }
 
 impl DimData {
@@ -222,7 +184,7 @@ impl LayerShellHandler for DimData {
 
         let (width, height) = configure.new_size;
         view.set_size(width, height);
-        view.viewport().set_destination(width as _, height as _);
+        view.viewport_mut().set_destination(width as _, height as _);
 
         if view.first_configure() {
             view.draw(qh);
