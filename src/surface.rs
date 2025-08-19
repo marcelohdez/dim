@@ -51,11 +51,11 @@ impl DimSurface {
     }
 
     pub fn width(&self) -> u32 {
-        self.height
+        self.width
     }
 
     pub fn height(&self) -> u32 {
-        self.width
+        self.height
     }
 
     pub fn first_configure(&self) -> bool {
