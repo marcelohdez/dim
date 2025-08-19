@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use log::{debug, error, warn};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
@@ -57,7 +59,7 @@ pub struct DimData {
 
     alpha: f32,
     passthrough: bool,
-    surfaces: Vec<DimSurface>,
+    surfaces: HashMap<WlOutput, DimSurface>,
 
     keyboard: Option<wl_keyboard::WlKeyboard>,
     pointer: Option<wl_pointer::WlPointer>,
@@ -98,7 +100,7 @@ impl DimData {
 
             alpha,
             passthrough,
-            surfaces: Vec::new(),
+            surfaces: HashMap::new(),
 
             exit: false,
             keyboard: None,
@@ -116,19 +118,19 @@ impl DimData {
         &self,
         qh: &QueueHandle<Self>,
         buffer: BufferType,
-        output: WlOutput,
+        output: &WlOutput,
     ) -> DimSurface {
         let layer = self.layer_shell.create_layer_surface(
             qh,
             self.compositor.create_surface(qh),
             Layer::Overlay,
             Some("dim_layer"),
-            Some(&output),
+            Some(output),
         );
 
         let (width, height) = if let Some((width, height)) = self
             .output_state
-            .info(&output)
+            .info(output)
             .and_then(|info| info.logical_size)
         {
             (width as u32, height as u32)
@@ -154,7 +156,7 @@ impl DimData {
             .expect("wp_viewporter failed")
             .get_viewport(layer.wl_surface(), qh, ());
 
-        DimSurface::new(qh, buffer, viewport, layer, output)
+        DimSurface::new(qh, buffer, viewport, layer)
     }
 }
 
@@ -177,7 +179,11 @@ impl LayerShellHandler for DimData {
         configure: smithay_client_toolkit::shell::wlr_layer::LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        let Some(view) = self.surfaces.iter_mut().find(|view| view.layer() == layer) else {
+        let Some(view) = self
+            .surfaces
+            .values_mut()
+            .find(|view| view.layer() == layer)
+        else {
             error!("Configuring layer not in self.views?");
             return;
         };
@@ -253,8 +259,8 @@ impl OutputHandler for DimData {
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
         let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
-        let view = self.new_surface(qh, buffer, output);
-        self.surfaces.push(view);
+        let view = self.new_surface(qh, buffer, &output);
+        self.surfaces.insert(output, view);
     }
 
     fn update_output(
@@ -264,13 +270,9 @@ impl OutputHandler for DimData {
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
         let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
-        let new_view = self.new_surface(qh, buffer, output);
+        let new_view = self.new_surface(qh, buffer, &output);
 
-        if let Some(view) = self
-            .surfaces
-            .iter_mut()
-            .find(|v| v.output() == new_view.output())
-        {
+        if let Some(view) = self.surfaces.get_mut(&output) {
             *view = new_view;
         } else {
             error!("Updating output not in views list??");
@@ -283,7 +285,7 @@ impl OutputHandler for DimData {
         _qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        self.surfaces.retain(|v| v.output() != &output);
+        self.surfaces.remove(&output);
     }
 }
 

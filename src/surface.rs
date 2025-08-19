@@ -1,9 +1,6 @@
 use log::debug;
 use smithay_client_toolkit::{
-    reexports::{
-        client::{protocol::wl_output::WlOutput, QueueHandle},
-        protocols::wp::viewporter::client::wp_viewport::WpViewport,
-    },
+    reexports::{client::QueueHandle, protocols::wp::viewporter::client::wp_viewport::WpViewport},
     shell::{wlr_layer::LayerSurface, WaylandSurface},
 };
 
@@ -16,7 +13,6 @@ pub struct DimSurface {
     buffer: BufferType,
     viewport: WpViewport,
     layer: LayerSurface,
-    output: WlOutput,
 }
 
 impl DimSurface {
@@ -25,7 +21,6 @@ impl DimSurface {
         buffer: BufferType,
         viewport: WpViewport,
         layer: LayerSurface,
-        output: WlOutput,
     ) -> Self {
         Self {
             first_configure: true,
@@ -34,7 +29,6 @@ impl DimSurface {
             buffer,
             viewport,
             layer,
-            output,
         }
     }
 
@@ -66,10 +60,6 @@ impl DimSurface {
 
     pub fn first_configure(&self) -> bool {
         self.first_configure
-    }
-
-    pub fn output(&self) -> &WlOutput {
-        &self.output
     }
 
     pub fn layer(&self) -> &LayerSurface {
