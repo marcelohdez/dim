@@ -2,7 +2,7 @@
 name = "dim-screen"
 authors = ["Marcelo Hernandez <marcelohdez.inq@gmail.com>"]
 description = "Native Wayland screen dimming tool"
-homepage = "https://github.com/marcelohdez/dim"
+repository = "https://github.com/marcelohdez/dim"
 license = "GPL-3.0-only"
 keywords = ["wayland", "smithay"]
 
