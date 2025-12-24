@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use log::{debug, error, warn};
 use smithay_client_toolkit::{
@@ -59,6 +59,7 @@ pub struct DimData {
 
     alpha: f32,
     passthrough: bool,
+    start_time: Instant,
     surfaces: HashMap<WlOutput, DimSurface>,
 
     keyboard: Option<wl_keyboard::WlKeyboard>,
@@ -99,6 +100,7 @@ impl DimData {
 
             alpha: opts.alpha(),
             passthrough: opts.passthrough,
+            start_time: Instant::now(),
             surfaces: HashMap::new(),
 
             keyboard: None,
@@ -117,6 +119,7 @@ impl DimData {
         &self,
         qh: &QueueHandle<Self>,
         buffer: BufferType,
+        back_buffer: BufferType,
         output: &WlOutput,
     ) -> DimSurface {
         let layer = self.layer_shell.create_layer_surface(
@@ -155,7 +158,7 @@ impl DimData {
             .expect("wp_viewporter failed")
             .get_viewport(layer.wl_surface(), qh, ());
 
-        DimSurface::new(qh, buffer, viewport, layer)
+        DimSurface::new(qh, buffer, back_buffer, viewport, layer)
     }
 }
 
@@ -187,12 +190,8 @@ impl LayerShellHandler for DimData {
             return;
         };
 
-        if view.first_configure() {
-            let (width, height) = configure.new_size;
-            view.set_size(width, height);
-            view.viewport_mut().set_destination(width as _, height as _);
-            view.set_first_configure(false);
-        }
+        let (width, height) = configure.new_size;
+        view.set_size(width, height);
 
         view.draw(qh);
     }
@@ -225,6 +224,24 @@ impl CompositorHandler for DimData {
         _time: u32,
     ) {
         for view in self.surfaces.values_mut() {
+            let elapsed_sec = self.start_time.elapsed().as_millis() as f32 / 1000.;
+            let fade_sec = 0.5;
+
+            if elapsed_sec <= fade_sec {
+                let alpha = self.alpha * (elapsed_sec / fade_sec);
+                match &mut self.buffer_mgr {
+                    BufferManager::SinglePixel(..) => {
+                        view.set_back_buffer(self.buffer_mgr.get_buffer(qh, alpha));
+                    }
+                    BufferManager::Shm(_, pool) => {
+                        if let BufferType::Shared(buffer) = view.back_buffer_mut() {
+                            let canvas = buffer.canvas(pool).expect("Canvas is not drawable.");
+                            BufferManager::paint(canvas, alpha);
+                        }
+                    }
+                }
+            }
+
             view.draw(qh);
         }
     }
@@ -259,8 +276,9 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
-        let view = self.new_surface(qh, buffer, &output);
+        let buffer = self.buffer_mgr.get_buffer(qh, 0.);
+        let back_buffer = self.buffer_mgr.get_buffer(qh, 0.);
+        let view = self.new_surface(qh, buffer, back_buffer, &output);
         self.surfaces.insert(output, view);
     }
 
@@ -270,8 +288,9 @@ impl OutputHandler for DimData {
         qh: &QueueHandle<Self>,
         output: smithay_client_toolkit::reexports::client::protocol::wl_output::WlOutput,
     ) {
-        let buffer = self.buffer_mgr.get_buffer(qh, self.alpha);
-        let new_view = self.new_surface(qh, buffer, &output);
+        let buffer = self.buffer_mgr.get_buffer(qh, 0.);
+        let back_buffer = self.buffer_mgr.get_buffer(qh, 0.);
+        let new_view = self.new_surface(qh, buffer, back_buffer, &output);
 
         if let Some(view) = self.surfaces.get_mut(&output) {
             *view = new_view;
