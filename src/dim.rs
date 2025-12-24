@@ -60,6 +60,7 @@ pub struct DimData {
     alpha: f32,
     passthrough: bool,
     start_time: Instant,
+    fade_sec: f32,
     surfaces: HashMap<WlOutput, DimSurface>,
 
     keyboard: Option<wl_keyboard::WlKeyboard>,
@@ -101,6 +102,7 @@ impl DimData {
             alpha: opts.alpha(),
             passthrough: opts.passthrough,
             start_time: Instant::now(),
+            fade_sec: opts.fade(),
             surfaces: HashMap::new(),
 
             keyboard: None,
@@ -225,10 +227,9 @@ impl CompositorHandler for DimData {
     ) {
         for view in self.surfaces.values_mut() {
             let elapsed_sec = self.start_time.elapsed().as_millis() as f32 / 1000.;
-            let fade_sec = 0.5;
 
-            if elapsed_sec <= fade_sec {
-                let alpha = self.alpha * (elapsed_sec / fade_sec);
+            if elapsed_sec <= self.fade_sec {
+                let alpha = self.alpha * (elapsed_sec / self.fade_sec);
                 match &mut self.buffer_mgr {
                     BufferManager::SinglePixel(..) => {
                         view.set_back_buffer(self.buffer_mgr.get_buffer(qh, alpha));

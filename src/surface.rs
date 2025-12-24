@@ -75,17 +75,13 @@ impl DimSurface {
             .set_destination(self.width as _, self.height as _);
     }
 
-    pub fn set_damaged(&mut self, damaged: bool) {
-        self.damaged = damaged;
-    }
-
     pub fn set_back_buffer(&mut self, back_buffer: BufferType) {
         self.back_buffer = back_buffer;
         self.damaged = true;
     }
 
     pub fn back_buffer_mut(&mut self) -> &mut BufferType {
-        self.damaged = true;
+        self.damaged = true; // we're most likely changing something.
         &mut self.back_buffer
     }
 }
