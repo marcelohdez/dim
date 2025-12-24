@@ -4,8 +4,7 @@ use std::{
     fs::File,
     io::read_to_string,
     path::{Path, PathBuf},
-    process, thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, Context};
@@ -31,24 +30,27 @@ fn main() -> anyhow::Result<()> {
         Some(config) => config.merge_onto_self(args),
         None => args,
     };
-
     debug!("Using options: {opts:?}");
-    let alpha = opts.alpha();
+
     let duration = opts.duration();
+    let start = Instant::now();
 
-    // A duration of 0 is considered as infinite, not starting the timer:
-    if duration > 0 {
-        thread::spawn(move || {
-            thread::sleep(Duration::from_secs(duration));
-            process::exit(0);
-        });
-    }
+    let (mut data, mut event_queue) = create_wl_app(opts)?;
 
-    let (mut data, mut event_queue) = create_wl_app(alpha, opts.passthrough)?;
+    let mut success = false;
     while !data.should_exit() {
         event_queue
             .blocking_dispatch(&mut data)
             .context("Failed to block on events!")?;
+
+        if timeout(start, duration) {
+            success = true;
+            break;
+        }
+    }
+
+    if success {
+        return Ok(());
     }
 
     Err(anyhow!("Some user input was detected!"))
@@ -88,7 +90,7 @@ fn get_config(dir: Option<&Path>) -> anyhow::Result<Option<DimOpts>> {
     Ok(Some(config))
 }
 
-fn create_wl_app(alpha: f32, passthrough: bool) -> anyhow::Result<(DimData, EventQueue<DimData>)> {
+fn create_wl_app(opts: DimOpts) -> anyhow::Result<(DimData, EventQueue<DimData>)> {
     let conn = Connection::connect_to_env().context("Failed to connect to environment")?;
 
     let (globals, event_queue) =
@@ -99,7 +101,11 @@ fn create_wl_app(alpha: f32, passthrough: bool) -> anyhow::Result<(DimData, Even
     let layer_shell = LayerShell::bind(&globals, &qh).context("Layer shell failed?")?;
 
     Ok((
-        DimData::new(compositor, &globals, &qh, layer_shell, alpha, passthrough),
+        DimData::new(compositor, &globals, &qh, layer_shell, opts),
         event_queue,
     ))
+}
+
+fn timeout(instant: Instant, duration: u64) -> bool {
+    return duration > 0 && instant.elapsed() >= Duration::from_secs(duration);
 }

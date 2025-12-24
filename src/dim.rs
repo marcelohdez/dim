@@ -45,7 +45,7 @@ use smithay_client_toolkit::{
 use crate::{
     buffer::{BufferManager, BufferType},
     consts::INIT_SIZE,
-    DimSurface,
+    DimOpts, DimSurface,
 };
 
 pub struct DimData {
@@ -74,8 +74,7 @@ impl DimData {
         globals: &GlobalList,
         qh: &QueueHandle<Self>,
         layer_shell: LayerShell,
-        alpha: f32,
-        passthrough: bool,
+        opts: DimOpts,
     ) -> Self {
         let buffer_mgr = match SimpleGlobal::<WpSinglePixelBufferManagerV1, 1>::bind(globals, qh) {
             Ok(sg) => BufferManager::SinglePixel(sg),
@@ -98,14 +97,14 @@ impl DimData {
             viewporter: SimpleGlobal::<wp_viewporter::WpViewporter, 1>::bind(globals, qh)
                 .expect("wp_viewporter not available"),
 
-            alpha,
-            passthrough,
+            alpha: opts.alpha(),
+            passthrough: opts.passthrough,
             surfaces: HashMap::new(),
 
-            exit: false,
             keyboard: None,
             pointer: None,
             touch: None,
+            exit: false,
         }
     }
 
@@ -184,18 +183,18 @@ impl LayerShellHandler for DimData {
             .values_mut()
             .find(|view| view.layer() == layer)
         else {
-            error!("Configuring layer not in self.views?");
+            error!("Configuring layer not in list?");
             return;
         };
 
-        let (width, height) = configure.new_size;
-        view.set_size(width, height);
-        view.viewport_mut().set_destination(width as _, height as _);
-
         if view.first_configure() {
-            view.draw(qh);
+            let (width, height) = configure.new_size;
+            view.set_size(width, height);
+            view.viewport_mut().set_destination(width as _, height as _);
             view.set_first_configure(false);
         }
+
+        view.draw(qh);
     }
 }
 
@@ -221,11 +220,13 @@ impl CompositorHandler for DimData {
     fn frame(
         &mut self,
         _conn: &smithay_client_toolkit::reexports::client::Connection,
-        _qh: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _time: u32,
     ) {
-        debug!("Frame");
+        for view in self.surfaces.values_mut() {
+            view.draw(qh);
+        }
     }
 
     fn surface_enter(

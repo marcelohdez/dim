@@ -15,14 +15,14 @@ pub struct DimOpts {
         long,
         help = format!("Duration in seconds, 0 is infinite, [default: {DEFAULT_DURATION}]")
     )]
-    pub duration: Option<u64>,
+    duration: Option<u64>,
 
     #[arg(
         short,
         long,
         help = format!("0.0 is transparent, 1.0 is opaque. When opaque, cursor will be hidden. [default: {DEFAULT_ALPHA}]")
     )]
-    pub alpha: Option<f32>,
+    alpha: Option<f32>,
 
     #[arg(
         short,

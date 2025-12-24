@@ -1,4 +1,3 @@
-use log::debug;
 use smithay_client_toolkit::{
     reexports::{client::QueueHandle, protocols::wp::viewporter::client::wp_viewport::WpViewport},
     shell::{wlr_layer::LayerSurface, WaylandSurface},
@@ -8,8 +7,11 @@ use crate::{buffer::BufferType, consts::INIT_SIZE, DimData};
 
 pub struct DimSurface {
     first_configure: bool,
+    damaged: bool,
+
     width: u32,
     height: u32,
+
     buffer: BufferType,
     viewport: WpViewport,
     layer: LayerSurface,
@@ -24,30 +26,34 @@ impl DimSurface {
     ) -> Self {
         Self {
             first_configure: true,
+            damaged: true,
+
             width: INIT_SIZE,
             height: INIT_SIZE,
+
             buffer,
             viewport,
             layer,
         }
     }
 
-    pub fn draw(&mut self, _qh: &QueueHandle<DimData>) {
-        debug!("Requesting draw");
-        if !self.first_configure {
-            // we only need to draw once as it is a static color
-            return;
+    pub fn draw(&mut self, qh: &QueueHandle<DimData>) {
+        if self.damaged {
+            let wl_buffer = match &self.buffer {
+                BufferType::Wl(wl_buffer) => wl_buffer,
+                BufferType::Shared(buffer) => buffer.wl_buffer(),
+            };
+
+            self.layer.wl_surface().attach(Some(wl_buffer), 0, 0);
+            self.damaged = false;
         }
 
-        let wl_buffer = match &self.buffer {
-            BufferType::Wl(wl_buffer) => wl_buffer,
-            BufferType::Shared(buffer) => buffer.wl_buffer(),
-        };
+        // request next frame
+        self.layer
+            .wl_surface()
+            .frame(qh, self.layer.wl_surface().clone());
 
-        self.layer.wl_surface().attach(Some(wl_buffer), 0, 0);
         self.layer.commit();
-
-        debug!("Drawn");
     }
 
     pub fn first_configure(&self) -> bool {
