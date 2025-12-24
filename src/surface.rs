@@ -38,15 +38,17 @@ impl DimSurface {
     }
 
     pub fn draw(&mut self, qh: &QueueHandle<DimData>) {
-        if self.damaged {
-            let wl_buffer = match &self.buffer {
-                BufferType::Wl(wl_buffer) => wl_buffer,
-                BufferType::Shared(buffer) => buffer.wl_buffer(),
-            };
-
-            self.layer.wl_surface().attach(Some(wl_buffer), 0, 0);
-            self.damaged = false;
+        if !self.damaged {
+            return;
         }
+
+        let wl_buffer = match &self.buffer {
+            BufferType::Wl(wl_buffer) => wl_buffer,
+            BufferType::Shared(buffer) => buffer.wl_buffer(),
+        };
+
+        self.layer.wl_surface().attach(Some(wl_buffer), 0, 0);
+        self.damaged = false;
 
         // request next frame
         self.layer

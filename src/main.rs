@@ -4,7 +4,8 @@ use std::{
     fs::File,
     io::read_to_string,
     path::{Path, PathBuf},
-    time::{Duration, Instant},
+    process, thread,
+    time::Duration,
 };
 
 use anyhow::{anyhow, Context};
@@ -30,27 +31,23 @@ fn main() -> anyhow::Result<()> {
         Some(config) => config.merge_onto_self(args),
         None => args,
     };
+
     debug!("Using options: {opts:?}");
 
     let duration = opts.duration();
-    let start = Instant::now();
+    // We consider a duration of 0 as infinite, not starting the timer
+    if duration > 0 {
+        thread::spawn(move || {
+            thread::sleep(Duration::from_secs(duration));
+            process::exit(0);
+        });
+    }
 
     let (mut data, mut event_queue) = create_wl_app(opts)?;
-
-    let mut success = false;
     while !data.should_exit() {
         event_queue
             .blocking_dispatch(&mut data)
             .context("Failed to block on events!")?;
-
-        if timeout(start, duration) {
-            success = true;
-            break;
-        }
-    }
-
-    if success {
-        return Ok(());
     }
 
     Err(anyhow!("Some user input was detected!"))
@@ -104,8 +101,4 @@ fn create_wl_app(opts: DimOpts) -> anyhow::Result<(DimData, EventQueue<DimData>)
         DimData::new(compositor, &globals, &qh, layer_shell, opts),
         event_queue,
     ))
-}
-
-fn timeout(instant: Instant, duration: u64) -> bool {
-    return duration > 0 && instant.elapsed() >= Duration::from_secs(duration);
 }
