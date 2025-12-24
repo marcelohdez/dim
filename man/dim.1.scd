@@ -35,6 +35,10 @@ detected after its timeout, swaylock will be run, locking the screen.
 	Set the *alpha* value of the overlay, 0.0 being transparent and 1.0 being
 	solid black. When solid, cursor will be hidden. Default is 0.5.
 
+\-f, --fade <FADE_DURATION>
+	Duration of fade-in animation in seconds. Must be at least 0, and at most
+	equal to the duration option above. Default is 0.5.
+
 \-p, --passthrough
 	Make dim ignore input, passing it to the surfaces behind it, making dim act as
 	a way to lower your brightness artificially. You probably want to set the
@@ -69,5 +73,6 @@ options are alpha, duration and passthrough as seen above, example config:
 # i am a comment!
 duration = 30
 alpha = 0.5
+fade = 0.5
 passthrough = false
 ```
