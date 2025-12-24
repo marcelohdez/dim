@@ -5,7 +5,7 @@ use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate_to, Shell};
 use serde::Deserialize;
 
-use crate::{consts::DEFAULT_ALPHA, consts::DEFAULT_DURATION};
+use crate::consts::{DEFAULT_ALPHA, DEFAULT_DURATION, DEFAULT_FADE};
 
 #[derive(Debug, Deserialize, Parser)]
 #[command(author, version, about)]
@@ -23,6 +23,14 @@ pub struct DimOpts {
         help = format!("0.0 is transparent, 1.0 is opaque. When opaque, cursor will be hidden. [default: {DEFAULT_ALPHA}]")
     )]
     alpha: Option<f32>,
+
+    #[arg(
+        short,
+        long,
+        help = format!("Fade-in animation duration in seconds. [default: {DEFAULT_FADE}]")
+    )]
+    #[serde(default)]
+    pub fade: Option<f32>,
 
     #[arg(
         short,
@@ -73,6 +81,14 @@ impl DimOpts {
             }
         }
 
+        if let Some(fade) = self.fade {
+            if !(0.0..=self.duration() as f32).contains(&fade) {
+                return Err(anyhow!(
+                    "Fade must be at least 0 and as much as the duration option."
+                ));
+            }
+        }
+
         Ok(())
     }
 
@@ -84,5 +100,10 @@ impl DimOpts {
     /// Get user desired duration or the default value.
     pub fn duration(&self) -> u64 {
         self.duration.unwrap_or(DEFAULT_DURATION)
+    }
+
+    /// Get user desired fade or the default value.
+    pub fn fade(&self) -> f32 {
+        self.fade.unwrap_or(DEFAULT_FADE)
     }
 }
