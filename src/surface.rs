@@ -6,13 +6,14 @@ use smithay_client_toolkit::{
 use crate::{buffer::BufferType, consts::INIT_SIZE, DimData};
 
 pub struct DimSurface {
-    first_configure: bool,
     damaged: bool,
 
     width: u32,
     height: u32,
 
     buffer: BufferType,
+    back_buffer: BufferType,
+
     viewport: WpViewport,
     layer: LayerSurface,
 }
@@ -21,17 +22,18 @@ impl DimSurface {
     pub fn new(
         _qh: &QueueHandle<DimData>,
         buffer: BufferType,
+        back_buffer: BufferType,
         viewport: WpViewport,
         layer: LayerSurface,
     ) -> Self {
         Self {
-            first_configure: true,
             damaged: true,
 
             width: INIT_SIZE,
             height: INIT_SIZE,
 
             buffer,
+            back_buffer,
             viewport,
             layer,
         }
@@ -42,13 +44,17 @@ impl DimSurface {
             return;
         }
 
-        let wl_buffer = match &self.buffer {
+        let wl_buffer = match &self.back_buffer {
             BufferType::Wl(wl_buffer) => wl_buffer,
             BufferType::Shared(buffer) => buffer.wl_buffer(),
         };
 
         self.layer.wl_surface().attach(Some(wl_buffer), 0, 0);
+        self.layer
+            .wl_surface()
+            .damage(0, 0, self.width as _, self.height as _);
         self.damaged = false;
+        std::mem::swap(&mut self.buffer, &mut self.back_buffer);
 
         // request next frame
         self.layer
@@ -58,25 +64,29 @@ impl DimSurface {
         self.layer.commit();
     }
 
-    pub fn first_configure(&self) -> bool {
-        self.first_configure
-    }
-
     pub fn layer(&self) -> &LayerSurface {
         &self.layer
-    }
-
-    pub fn set_first_configure(&mut self, value: bool) {
-        self.first_configure = value;
     }
 
     pub fn set_size(&mut self, width: u32, height: u32) {
         self.width = width;
         self.height = height;
+        self.viewport
+            .set_destination(self.width as _, self.height as _);
     }
 
-    pub fn viewport_mut(&mut self) -> &mut WpViewport {
-        &mut self.viewport
+    pub fn set_damaged(&mut self, damaged: bool) {
+        self.damaged = damaged;
+    }
+
+    pub fn set_back_buffer(&mut self, back_buffer: BufferType) {
+        self.back_buffer = back_buffer;
+        self.damaged = true;
+    }
+
+    pub fn back_buffer_mut(&mut self) -> &mut BufferType {
+        self.damaged = true;
+        &mut self.back_buffer
     }
 }
 

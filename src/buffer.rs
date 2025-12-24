@@ -49,15 +49,18 @@ impl BufferManager {
                     .create_buffer(1, 1, 4, wl_shm::Format::Argb8888)
                     .expect("Failed to get buffer from slot pool!");
 
-                // ARGB is actually backwards being little-endian, so we set BGR to 0 for black so
-                (0..3).for_each(|i| {
-                    canvas[i] = 0;
-                });
-                // then, we set pre-multiplied alpha
-                canvas[3] = (u8::MAX as f32 * alpha) as u8;
-
+                BufferManager::paint(canvas, alpha);
                 BufferType::Shared(buffer)
             }
         }
+    }
+
+    pub fn paint(canvas: &mut [u8], alpha: f32) {
+        // RGB
+        (0..3).for_each(|i| {
+            canvas[i] = 0;
+        });
+        // ...A
+        canvas[3] = (u8::MAX as f32 * alpha) as u8;
     }
 }
