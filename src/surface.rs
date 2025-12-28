@@ -6,8 +6,6 @@ use smithay_client_toolkit::{
 use crate::{buffer::BufferType, consts::INIT_SIZE, DimData};
 
 pub struct DimSurface {
-    damaged: bool,
-
     width: u32,
     height: u32,
 
@@ -27,8 +25,6 @@ impl DimSurface {
         layer: LayerSurface,
     ) -> Self {
         Self {
-            damaged: true,
-
             width: INIT_SIZE,
             height: INIT_SIZE,
 
@@ -39,11 +35,7 @@ impl DimSurface {
         }
     }
 
-    pub fn draw(&mut self, qh: &QueueHandle<DimData>) {
-        if !self.damaged {
-            return;
-        }
-
+    pub fn draw(&mut self, qh: &QueueHandle<DimData>, request_next: bool) {
         let wl_buffer = match &self.back_buffer {
             BufferType::Wl(wl_buffer) => wl_buffer,
             BufferType::Shared(buffer) => buffer.wl_buffer(),
@@ -53,13 +45,13 @@ impl DimSurface {
         self.layer
             .wl_surface()
             .damage(0, 0, self.width as _, self.height as _);
-        self.damaged = false;
         std::mem::swap(&mut self.buffer, &mut self.back_buffer);
 
-        // request next frame
-        self.layer
-            .wl_surface()
-            .frame(qh, self.layer.wl_surface().clone());
+        if request_next {
+            self.layer
+                .wl_surface()
+                .frame(qh, self.layer.wl_surface().clone());
+        }
 
         self.layer.commit();
     }
@@ -77,11 +69,9 @@ impl DimSurface {
 
     pub fn set_back_buffer(&mut self, back_buffer: BufferType) {
         self.back_buffer = back_buffer;
-        self.damaged = true;
     }
 
     pub fn back_buffer_mut(&mut self) -> &mut BufferType {
-        self.damaged = true; // we're most likely changing something.
         &mut self.back_buffer
     }
 }

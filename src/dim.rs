@@ -197,7 +197,7 @@ impl LayerShellHandler for DimData {
         let (width, height) = configure.new_size;
         view.set_size(width, height);
 
-        view.draw(qh);
+        view.draw(qh, !self.fade_done);
     }
 }
 
@@ -224,34 +224,40 @@ impl CompositorHandler for DimData {
         &mut self,
         _conn: &smithay_client_toolkit::reexports::client::Connection,
         qh: &QueueHandle<Self>,
-        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _time: u32,
     ) {
-        for view in self.surfaces.values_mut() {
-            let elapsed_sec = self.start_time.elapsed().as_millis() as f32 / 1000.;
+        let Some((_, view)) = self
+            .surfaces
+            .iter_mut()
+            .find(|(_, view)| view.layer().wl_surface() == surface)
+        else {
+            panic!("Frame event received for surface we do not own.")
+        };
 
-            if !self.fade_done {
-                let alpha = (self.alpha * (elapsed_sec / self.fade_sec)).clamp(0., self.alpha);
-                match &mut self.buffer_mgr {
-                    BufferManager::SinglePixel(..) => {
-                        view.set_back_buffer(self.buffer_mgr.get_buffer(qh, alpha));
-                    }
-                    BufferManager::Shm(_, pool) => {
-                        if let BufferType::Shared(buffer) = view.back_buffer_mut() {
-                            let canvas = buffer.canvas(pool).expect("Canvas is not drawable.");
-                            BufferManager::paint(canvas, alpha);
-                        }
-                    }
+        let elapsed_sec = self.start_time.elapsed().as_millis() as f32 / 1000.;
+
+        if !self.fade_done {
+            let alpha = (self.alpha * (elapsed_sec / self.fade_sec)).clamp(0., self.alpha);
+            match &mut self.buffer_mgr {
+                BufferManager::SinglePixel(..) => {
+                    view.set_back_buffer(self.buffer_mgr.get_buffer(qh, alpha));
                 }
-
-                if elapsed_sec > self.fade_sec {
-                    self.fade_done = true;
-                    debug!("Fade done!")
+                BufferManager::Shm(_, pool) => {
+                    if let BufferType::Shared(buffer) = view.back_buffer_mut() {
+                        let canvas = buffer.canvas(pool).expect("Canvas is not drawable.");
+                        BufferManager::paint(canvas, alpha);
+                    }
                 }
             }
 
-            view.draw(qh);
+            if elapsed_sec > self.fade_sec {
+                self.fade_done = true;
+                debug!("Fade done!")
+            }
         }
+
+        view.draw(qh, !self.fade_done);
     }
 
     fn surface_enter(
