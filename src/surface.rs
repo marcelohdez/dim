@@ -3,12 +3,9 @@ use smithay_client_toolkit::{
     shell::{wlr_layer::LayerSurface, WaylandSurface},
 };
 
-use crate::{buffer::BufferType, consts::INIT_SIZE, DimData};
+use crate::{buffer::BufferType, DimData};
 
 pub struct DimSurface {
-    width: u32,
-    height: u32,
-
     buffer: BufferType,
     back_buffer: BufferType,
 
@@ -25,9 +22,6 @@ impl DimSurface {
         layer: LayerSurface,
     ) -> Self {
         Self {
-            width: INIT_SIZE,
-            height: INIT_SIZE,
-
             buffer,
             back_buffer,
             viewport,
@@ -42,9 +36,7 @@ impl DimSurface {
         };
 
         self.layer.wl_surface().attach(Some(wl_buffer), 0, 0);
-        self.layer
-            .wl_surface()
-            .damage(0, 0, self.width as _, self.height as _);
+        self.layer.wl_surface().damage_buffer(0, 0, 1, 1);
         std::mem::swap(&mut self.buffer, &mut self.back_buffer);
 
         if request_next {
@@ -60,11 +52,8 @@ impl DimSurface {
         &self.layer
     }
 
-    pub fn set_size(&mut self, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
-        self.viewport
-            .set_destination(self.width as _, self.height as _);
+    pub fn set_size(&mut self, width: i32, height: i32) {
+        self.viewport.set_destination(width, height);
     }
 
     pub fn set_back_buffer(&mut self, back_buffer: BufferType) {

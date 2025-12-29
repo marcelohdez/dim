@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Instant};
 
-use log::{debug, error, warn};
+use log::{debug, warn};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, Region},
     delegate_compositor, delegate_keyboard, delegate_layer, delegate_output, delegate_pointer,
@@ -44,7 +44,6 @@ use smithay_client_toolkit::{
 
 use crate::{
     buffer::{BufferManager, BufferType},
-    consts::INIT_SIZE,
     DimOpts, DimSurface,
 };
 
@@ -134,15 +133,11 @@ impl DimData {
             Some(output),
         );
 
-        let (width, height) = if let Some((width, height)) = self
+        let (width, height) = self
             .output_state
             .info(output)
             .and_then(|info| info.logical_size)
-        {
-            (width as u32, height as u32)
-        } else {
-            (INIT_SIZE, INIT_SIZE)
-        };
+            .unwrap_or((1920, 1080)); // no info for this output yet, default size
 
         if self.passthrough {
             let input_region = Region::new(&self.compositor).expect("Failed to get a wl_region");
@@ -153,7 +148,7 @@ impl DimData {
         }
 
         layer.set_exclusive_zone(-1);
-        layer.set_size(width, height);
+        layer.set_size(width as _, height as _);
         layer.commit();
 
         let viewport = self
@@ -185,17 +180,14 @@ impl LayerShellHandler for DimData {
         configure: smithay_client_toolkit::shell::wlr_layer::LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        let Some(view) = self
+        let view = self
             .surfaces
             .values_mut()
             .find(|view| view.layer() == layer)
-        else {
-            error!("Configuring layer not in list?");
-            return;
-        };
+            .expect("Configuring layer not in list.");
 
         let (width, height) = configure.new_size;
-        view.set_size(width, height);
+        view.set_size(width as _, height as _);
 
         view.draw(qh, !self.fade_done);
     }
@@ -227,13 +219,11 @@ impl CompositorHandler for DimData {
         surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _time: u32,
     ) {
-        let Some((_, view)) = self
+        let view = self
             .surfaces
-            .iter_mut()
-            .find(|(_, view)| view.layer().wl_surface() == surface)
-        else {
-            panic!("Frame event received for surface we do not own.")
-        };
+            .values_mut()
+            .find(|view| view.layer().wl_surface() == surface)
+            .expect("Frame event received for surface we do not own.");
 
         let elapsed_sec = self.start_time.elapsed().as_millis() as f32 / 1000.;
 
@@ -306,11 +296,7 @@ impl OutputHandler for DimData {
         let back_buffer = self.buffer_mgr.get_buffer(qh, 0.);
         let new_view = self.new_surface(qh, buffer, back_buffer, &output);
 
-        if let Some(view) = self.surfaces.get_mut(&output) {
-            *view = new_view;
-        } else {
-            error!("Updating output not in views list??");
-        }
+        self.surfaces.insert(output, new_view);
     }
 
     fn output_destroyed(
