@@ -82,7 +82,9 @@ impl DimOpts {
         }
 
         if let Some(fade) = self.fade {
-            if !(0.0..=self.duration() as f32).contains(&fade) {
+            // Fade should be less than duration, however if duration is 0 (considered infinite)
+            // then we ignore this check.
+            if self.duration() > 0 && !(0.0..=self.duration() as f32).contains(&fade) {
                 return Err(anyhow!(
                     "Fade must be at least 0 and as much as the duration option."
                 ));
